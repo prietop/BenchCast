@@ -5,7 +5,7 @@ static pthread_barrier_t* barrier;
 
 void initialize_barrier()
 {
-    char    shm_name[] = "/tmp/pthread_barrierattr_getpshared";
+    char    shm_name[] = "tmp_pthread_barrierattr_getpshared";
     int     shm_fd;
     shm_fd = shm_open(shm_name, O_RDWR, 0644);
     if(shm_fd == -1)
