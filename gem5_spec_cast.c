@@ -136,7 +136,7 @@ int main (int argc, char **argv)
     int	pshared = PTHREAD_PROCESS_SHARED;
 
     // Shared memory portion (through file)
-    char 	shm_name[] = "tmp_pthread_barrierattr_getpshared";
+    char 	shm_name[] = "/tmp/pthread_barrierattr_getpshared";
     int 	shm_fd;
 
     // child process pids
