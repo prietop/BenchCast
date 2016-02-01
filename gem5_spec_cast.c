@@ -304,8 +304,8 @@ int main (int argc, char **argv)
             printf("now pwd : %s\n", new_wd);
         }
         fprintf(stderr, "%d executing %s\n", getpid(), my_app);
-        char *prog[] = { "./launch_script.sh", "", NULL };
-        rc = execv("./launch_script.sh", prog);
+        char *prog[] = { "./launch.sh", "", NULL };
+        rc = execv("./launch.sh", prog);
     }
 
     if(rc != 0 && rc != PTHREAD_BARRIER_SERIAL_THREAD)
