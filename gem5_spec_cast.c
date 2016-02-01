@@ -124,6 +124,9 @@ int main (int argc, char **argv)
 
     pid_t child_pid;
 
+    // M5 OP intitialization
+    map_m5_mem();
+
     /* Make sure there is process-shared capability. */
     #ifndef PTHREAD_PROCESS_SHARED
     fprintf(stderr,"process-shared attribute is not available for testing\n");
