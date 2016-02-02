@@ -26,5 +26,4 @@ int initialize_barrier()
 void call_barrier()
 {
     pthread_barrier_wait(barrier);
-    printf("Begin ROI\n");
 }
