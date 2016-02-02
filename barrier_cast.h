@@ -3,7 +3,7 @@
 
 static pthread_barrier_t* barrier;
 
-void initialize_barrier()
+int initialize_barrier()
 {
     char    shm_name[] = "tmp_pthread_barrierattr_getpshared";
     int     shm_fd;
@@ -20,6 +20,7 @@ void initialize_barrier()
       perror("[E] child: Error at first mmap()");
       return -1;
     }
+    return 0;
 }
 
 void call_barrier()
