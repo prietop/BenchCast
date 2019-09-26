@@ -11,6 +11,7 @@ Author: Pablo Prieto Torralbo <prietop@unican.es>
 #include <sched.h> // linux
 
 #define MAX_CWD 80
+#define MAX_APP_LENGTH 20
 #define MAX_THREADS 128
 
 static int max_num_processors;
@@ -61,7 +62,7 @@ static void bind_pid (int cpu_num, pid_t PID_NUM)
             if(errno == ESRCH)
             { fprintf(stderr, "No process or thread with the given ID found."); }
             if(errno == EFAULT)
-            { fprintf(stderr, "The pointer cpuset is does not point to a valid object."); }
+            { fprintf(stderr, "The pointer cpuset does not point to a valid object."); }
             if(errno == EINVAL)
             { fprintf(stderr, "The bitset is not valid. This might mean that "
                 "the affinity set might not leave a processor for the process "

@@ -7,8 +7,6 @@ Author: Pablo Prieto Torralbo <prietop@unican.es>
 #include <pthread.h>
 #include <unistd.h>
 #include <sys/mman.h>
-//#include <sys/processor.h> // solaris
-//#include <sys/procset.h> // solaris
 #include <fcntl.h>
 #include <sys/wait.h>
 #include <sys/stat.h>
@@ -29,9 +27,8 @@ int main (int argc, char **argv)
     // options struct defined in gem5_spec_cast.h
 
     int option_index = 0;
-
-    char app[max_num_processors][15];
-    char my_app[15];
+    char app[max_num_processors][MAX_APP_LENGTH];
+    char my_app[MAX_APP_LENGTH];
     int app_index=0;
     int num_processors=0;
     int num_apps=0;
@@ -123,9 +120,13 @@ int main (int argc, char **argv)
     }
 
     pid_t child_pid;
-
-    // M5 OP intitialization
-    map_m5_mem();
+    
+    if (gem5_work_op > 0)
+    {
+        // M5 OP intitialization
+        // Assume gem5 uses kvm to create checkpoints
+        map_m5_mem();
+    }
 
     /* Make sure there is process-shared capability. */
     #ifndef PTHREAD_PROCESS_SHARED
@@ -256,12 +257,14 @@ int main (int argc, char **argv)
         }
         else if(pid[proc] == 0)
         {
+            //child (SPEC app)
             bind_pid(proc, getpid());
             strcpy(my_app, app[app_index]);
             break;
         }
         else
         {
+            //parent (spec_cast)
             printf("parent pid : %d, child pid : %d\n", (int)getpid(), pid[proc]);
         }
         proc++;
