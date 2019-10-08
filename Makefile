@@ -1,5 +1,5 @@
 CC=gcc
-CFLAGS=-lpthread -lrt -DM5OP_ADDR=0xFFFF0000
+CFLAGS=-pthread -lrt -DM5OP_ADDR=0xFFFF0000
 SFLAGS= -DM5OP_ADDR=0xFFFF0000
 # Final run:
 CFLAGS += -O2
