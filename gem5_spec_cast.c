@@ -341,20 +341,25 @@ int main (int argc, char **argv)
             exit(EXIT_FAILURE);
         }
         printf("pwd : %s\n", cast_wd);
-        if(chdir_before_exec)
+        fprintf(stderr, "%d executing %s %d\n", getpid(), my_app, my_sub_app);
+        char my_cmd[4];
+        sprintf(my_cmd, "%d", my_sub_app);
+        char *prog[] = { "./launch_spec.py", "--spec", my_app, "--cmd", my_cmd, "--conf", config, NULL };
+        fprintf(stderr, "Executing: ");
+        int i=0;
+        while(prog[i]!=NULL)
         {
-            if (chdir(my_app) == -1)
-            {
-                perror("chdir");
-                exit(EXIT_FAILURE);
-            }
-            printf("cd to %s, done\n", my_app);
-            new_wd = getcwd(buf, allocSize);
-            printf("now pwd : %s\n", new_wd);
+            fprintf(stderr, " %s", prog[i]);
+            i++;
         }
-        fprintf(stderr, "%d executing %s\n", getpid(), my_app);
-        char *prog[] = { "./launch.sh", "", NULL };
-        rc = execv("./launch.sh", prog);
+        fprintf(stderr, "\n");
+        rc = execv("./launch_spec.py", prog);
+    }
+
+    if(pid[proc] != 0 && gem5_work_op>0)
+    {
+        //execute m5_work_begin_op
+        m5_work_begin(0);
     }
 
     if(rc != 0 && rc != PTHREAD_BARRIER_SERIAL_THREAD)
@@ -371,12 +376,6 @@ int main (int argc, char **argv)
     {
         printf("process %d: get along with the barrier\n"
         , getpid());
-    }
-
-    if(pid[proc] != 0 && gem5_work_op>0)
-    {
-        //execute m5_work_begin_op
-        m5_work_begin(0);
     }
 
     if(pid[proc] != 0 && waiting==1)
