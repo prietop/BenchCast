@@ -28,25 +28,51 @@ int main (int argc, char **argv)
 
     int option_index = 0;
     char app[max_num_processors][MAX_APP_LENGTH];
+    int sub_app[max_num_processors];
     char my_app[MAX_APP_LENGTH];
+    char config[20] = "gem5";
+    int my_sub_app;
     int app_index=0;
     int num_processors=0;
     int num_apps=0;
+    int num_loops=1;
+
+    int *pid;
+    static spec_barrier_t* my_barrier;
+    char 	shm_name[] = "tmp_pthread_barrierattr_getpshared";
 
     while (c >= 0)
     {
         c = getopt_long (argc, argv, "dwbp:n:", long_options, &option_index);
 
         if(c == -1)
-        break;
+            break;
         switch (c)
         {
             case 0:
+            //long option with no arguments
             printf ("App: %s\n", long_options[option_index].name);
-            /* If this option set a flag, do nothing else now. */
+            /* If this option set a flag, do nothing else now (help). */
             if (long_options[option_index].flag != 0)
             break;
             strcpy(app[app_index], long_options[option_index].name);
+            sub_app[app_index]=1;
+            app_index++;
+            break;
+
+            case 1:
+            //long option with required arguments
+            printf ("App: %s\n", long_options[option_index].name);
+            strcpy(app[app_index], long_options[option_index].name);
+            sub_app[app_index]=atoi(optarg);
+            if(sub_app[app_index]<=0)
+            {
+                fprintf(stderr, "\n*** ERROR *** Application \"%s\"", app[app_index]); 
+                fprintf(stderr, " requires benchmark number \n\n\n");
+                usage(argv[0]);
+                break;
+            }
+            printf("Using benchmark %d of %s\n", sub_app[app_index], app[app_index]);
             app_index++;
             break;
 
@@ -134,17 +160,15 @@ int main (int argc, char **argv)
     return -2;
     #endif
 
-    // This barrier will be shared between threads
-    static pthread_barrier_t* barrier;
+    // The barrier will be shared between threads
     pthread_barrierattr_t ba;
     int	pshared = PTHREAD_PROCESS_SHARED;
 
     // Shared memory portion (through file)
-    char 	shm_name[] = "tmp_pthread_barrierattr_getpshared";
     int 	shm_fd;
 
     // child process pids
-    int 	pid[max_num_processors+1];
+    pid = (int *)malloc(sizeof(int)*(max_num_processors+1));
     // generic return value
     int	    rc;
     // returning status of child processes
@@ -202,7 +226,7 @@ int main (int argc, char **argv)
     }
 
     // define size of shared object
-    if(ftruncate(shm_fd, sizeof(pthread_barrier_t)) != 0)
+    if(ftruncate(shm_fd, sizeof(spec_barrier_t)) != 0)
     {
         perror("[E] Error at ftruncate()");
         shm_unlink(shm_name);
@@ -210,10 +234,10 @@ int main (int argc, char **argv)
     }
 
     /* Map the shared memory object to my memory */
-    barrier = mmap(NULL, sizeof(pthread_barrier_t), PROT_READ|PROT_WRITE,
+    my_barrier = (spec_barrier_t*)mmap(NULL, sizeof(spec_barrier_t), PROT_READ|PROT_WRITE,
     MAP_SHARED, shm_fd, (off_t)0);
 
-    if(barrier == MAP_FAILED)
+    if(my_barrier == MAP_FAILED)
     {
         perror("[E] Error at first mmap()");
         shm_unlink(shm_name);
@@ -222,11 +246,12 @@ int main (int argc, char **argv)
 
     /* Initialize a barrier */
     printf("Num processors = %d\n", num_processors);
-    if((pthread_barrier_init(barrier, &ba, num_processors+waiting)) != 0)
+    if((pthread_barrier_init(&my_barrier->barrier, &ba, num_processors+waiting)) != 0)
     {
         printf("[W] Error at pthread_barrier_init()\n");
         return -3;
     }
+    my_barrier->doWait=true;
 
     // Initialize pids
     int proc;
@@ -260,6 +285,7 @@ int main (int argc, char **argv)
             //child (SPEC app)
             bind_pid(proc, getpid());
             strcpy(my_app, app[app_index]);
+            my_sub_app = sub_app[app_index];
             break;
         }
         else
@@ -286,10 +312,17 @@ int main (int argc, char **argv)
     */
 
     rc = -1;
+    int numWaits=0;
     if(pid[proc]!=0 && waiting==1)
     {
-        printf("Parent Waiting\n");
-        rc = pthread_barrier_wait(barrier);
+        while(my_barrier->doWait)
+        {
+            fprintf(stderr,"Parent Waiting %d\n", numWaits);
+            rc = pthread_barrier_wait(&my_barrier->barrier);
+            numWaits++;
+            if(numWaits>=num_loops)
+            { my_barrier->doWait=false; }
+        }
     }
     else
     {
@@ -363,7 +396,7 @@ int main (int argc, char **argv)
         printf("[I] All done.\n");
 
         /* Cleanup */
-        if(pthread_barrier_destroy(barrier) != 0)
+        if(pthread_barrier_destroy(&my_barrier->barrier) != 0)
         {
             printf("[W] Error at pthread_barrier_destroy()");
             return -3;

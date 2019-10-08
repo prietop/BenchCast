@@ -1,7 +1,14 @@
 #include <pthread.h>
 #include <sys/mman.h>
+#include <stdbool.h>
+#include <fcntl.h>
 
-static pthread_barrier_t* barrier;
+typedef struct spec_barrier {
+   pthread_barrier_t barrier;
+   bool doWait;;
+} spec_barrier_t;
+
+static spec_barrier_t* my_barrier;
 
 int initialize_barrier()
 {
@@ -10,12 +17,12 @@ int initialize_barrier()
     shm_fd = shm_open(shm_name, O_RDWR, 0644);
     if(shm_fd == -1)
     {
-      perror("[E] [Bzip2] Error at shm_open()");
+      perror("[E] Error at shm_open()");
       return -2;
     }
-    barrier = mmap(NULL, sizeof(pthread_barrier_t), PROT_READ|PROT_WRITE,
+    my_barrier = (spec_barrier_t*)mmap(NULL, sizeof(spec_barrier_t), PROT_READ|PROT_WRITE,
       MAP_SHARED, shm_fd, (off_t)0);
-    if(barrier == MAP_FAILED)
+    if(my_barrier == MAP_FAILED)
     {
       perror("[E] child: Error at first mmap()");
       return -1;
@@ -25,5 +32,6 @@ int initialize_barrier()
 
 void call_barrier()
 {
-    pthread_barrier_wait(barrier);
+  if(my_barrier->doWait)
+    pthread_barrier_wait(&my_barrier->barrier);
 }

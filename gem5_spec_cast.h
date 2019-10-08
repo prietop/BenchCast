@@ -8,11 +8,17 @@ Author: Pablo Prieto Torralbo <prietop@unican.es>
 #include <stdio.h>
 #include <stdlib.h>
 #include <errno.h>
+#include <stdbool.h>
 #include <sched.h> // linux
 
 #define MAX_CWD 80
 #define MAX_APP_LENGTH 20
 #define MAX_THREADS 128
+
+typedef struct spec_barrier {
+   pthread_barrier_t barrier;
+   bool doWait;;
+} spec_barrier_t;
 
 static int max_num_processors;
 static int print_help;
@@ -89,36 +95,29 @@ void sig_handler()
 static struct option long_options[] =
 {
     /* These options set a flag. */
-    {"perlbench", no_argument, 0, 0},
-    {"bzip2",     no_argument, 0, 0},
-    {"gcc",       no_argument, 0, 0},
-    {"bwaves",    no_argument, 0, 0},
-    {"gamess",    no_argument, 0, 0},
+    {"perlbench", required_argument, 0, 1},
+    {"gcc",       required_argument, 0, 1},
+    {"bwaves",    required_argument, 0, 1},
     {"mcf",       no_argument, 0, 0},
-    {"milc",      no_argument, 0, 0},
-    {"zeusmp",    no_argument, 0, 0},
-    {"gromacs",   no_argument, 0, 0},
-    {"cactusADM", no_argument, 0, 0},
-    {"leslie3d",  no_argument, 0, 0},
+    {"cactusBSSN",no_argument, 0, 0},
     {"namd",      no_argument, 0, 0},
-    {"gobmk",     no_argument, 0, 0},
-    {"dealII",    no_argument, 0, 0},
-    {"soplex",    no_argument, 0, 0},
+    {"parest",    no_argument, 0, 0},
     {"povray",    no_argument, 0, 0},
-    {"calculix",  no_argument, 0, 0},
-    {"hmmer",     no_argument, 0, 0},
-    {"sjeng",     no_argument, 0, 0},
-    {"GemsFDTD",  no_argument, 0, 0},
-    {"libquantum", no_argument, 0, 0},
-    {"h264ref",   no_argument, 0, 0},
-    {"tonto",     no_argument, 0, 0},
     {"lbm",       no_argument, 0, 0},
     {"omnetpp",   no_argument, 0, 0},
-    {"astar",     no_argument, 0, 0},
     {"wrf",       no_argument, 0, 0},
-    {"sphinx3",   no_argument, 0, 0},
     {"xalancbmk", no_argument, 0, 0},
-    {"specrand",  no_argument, 0, 0},
+    {"x264",      required_argument, 0, 1},
+    {"blender",   no_argument, 0, 0},
+    {"cam4",      no_argument, 0, 0},
+    {"deepsjeng", no_argument, 0, 0},
+    {"imagick",   no_argument, 0, 0},
+    {"leela",     no_argument, 0, 0},
+    {"nab",       no_argument, 0, 0},
+    {"exchange2", no_argument, 0, 0},
+    {"fotonik3d", no_argument, 0, 0},
+    {"roms",      no_argument, 0, 0},
+    {"xz",        required_argument, 0, 1},
     {"help",      no_argument, &print_help, 1},
     {0, 0, 0, 0}
 };
