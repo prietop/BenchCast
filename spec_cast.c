@@ -2,7 +2,7 @@
 Author: Pablo Prieto Torralbo <prietop@unican.es>
 */
 
-#include "gem5_spec_cast.h"
+#include "spec_cast.h"
 
 #include <pthread.h>
 #include <unistd.h>
