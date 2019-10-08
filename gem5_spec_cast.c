@@ -43,7 +43,7 @@ int main (int argc, char **argv)
 
     while (c >= 0)
     {
-        c = getopt_long (argc, argv, "dwbp:n:", long_options, &option_index);
+        c = getopt_long(argc, argv, "dwbp:n:l:c:", long_options, &option_index);
 
         if(c == -1)
             break;
@@ -99,6 +99,16 @@ int main (int argc, char **argv)
             case 'n':
             num_apps=atoi(optarg);
             printf("Number of applications %d\n", num_apps);
+            break;
+
+            case 'l':
+            num_loops=atoi(optarg);
+            printf("Number of loops in ROI: %d\n", num_loops);
+            break;
+
+            case 'c':
+            strcpy(config,optarg);
+            printf("Config name: %s\n", config);
             break;
 
             case '?':

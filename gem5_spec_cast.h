@@ -25,25 +25,30 @@ static int print_help;
 
 static void usage(char *argv0) {
 
-  fprintf(stderr, "Usage: %s [-b] [-d] [-w] [-p number] [-n number] --<prog> "
-        "[--<prog2> --<prog3> ...]\n", argv0);
-  fprintf(stderr, "  prog is the program/s you want to cast.\n");
-  fprintf(stderr, "  -b makes %s to return immediately after launching the "
+  fprintf(stderr, "Usage: %s [-b] [-d] [-w] [-p number] [-n number] [-l number] "
+        "[-c config_name] --<prog> [number] [--<prog2> --<prog3> ...]\n", argv0);
+  fprintf(stderr, "   prog is the program/s you want to cast. Some programs"
+        " require an aditional param to indicate the benchmark number\n");
+  fprintf(stderr, "   among all available for that prog (check LAUNCH_CMKS.py"
+        " to see the benchmarks available for each prog)\n");
+  fprintf(stderr, "   -b makes %s to return immediately after launching the "
         "programs. The default is to wait for them to finish.\n", argv0);
-  fprintf(stderr, "  -d cd to the directory of the benchmark before running "
+  fprintf(stderr, "   -d cd to the directory of the benchmark before running "
         "the program. The directory should be the name of the program, for all "
         "the programs.\n");
-  fprintf(stderr, "  -p is the number of processors you want to use from the "
+  fprintf(stderr, "   -p is the number of processors you want to use from the "
         "system (default value: the number of available processors in the "
         "system, i.e: %d)\n", max_num_processors);
-  fprintf(stderr, "  -w should be used with GEM5, and executes a "
+  fprintf(stderr, "   -w should be used with GEM5, and executes a "
         "m5_work_begin_op\n");
-  fprintf(stderr, "  -n Number of different programs to run. It defaults to the"
+  fprintf(stderr, "   -n Number of different programs to run. It defaults to the"
         " number of progs arguments passed. Should be used as a control\n");
-  fprintf(stderr, "        %s -d -p 8 -n 2 --bzip2 --gcc\n", argv0);
-  fprintf(stderr, "      will run 4 instances of \"bzip2 \" and 4 instances of"
-        " \"gcc\" executing the \"launch_script.sh\" located in their "
-        "respectives directories (this launc_script.sh sould have the "
+  fprintf(stderr, "   -l Number of times the main loop of the ROI should be"
+        " executed before the creation of the checkpoint (end of spec_cast)\n");
+  fprintf(stderr, "        %s -d -p 8 -n 2 --mcf --bwaves 2\n", argv0);
+  fprintf(stderr, "      will run 4 instances of \"mcf \" and 4 instances of"
+        " \"bwaves\" (with input bwaves_2) executing the \"launch_script.sh\" located "
+        "in their respectives directories (this launc_script.sh sould have the "
         "appropiate command for the application execution)\n");
   fprintf(stderr, "\n");
 
