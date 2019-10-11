@@ -125,7 +125,7 @@ int main (int argc, char **argv)
 
     if (app_index <= 0)
     {
-        printf("\n** ERROR: No applications defined. Need at least one app **\n\n")
+        printf("\n** ERROR: No applications defined. Need at least one app **\n\n");
         usage(argv[0]);
     }
 

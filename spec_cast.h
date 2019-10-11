@@ -104,7 +104,7 @@ static struct option long_options[] =
     {"gcc",       required_argument, 0, 1},
     {"bwaves",    required_argument, 0, 1},
     {"mcf",       no_argument, 0, 0},
-    {"cactuBSSN",no_argument, 0, 0},
+    {"cactuBSSN", no_argument, 0, 0},
     {"namd",      no_argument, 0, 0},
     {"parest",    no_argument, 0, 0},
     {"povray",    no_argument, 0, 0},
