@@ -121,7 +121,13 @@ int main (int argc, char **argv)
     }
 
     if (print_help)
-      usage(argv[0]);
+        usage(argv[0]);
+
+    if (app_index <= 0)
+    {
+        printf("\n** ERROR: No applications defined. Need at least one app **\n\n")
+        usage(argv[0]);
+    }
 
     if(num_processors == 0)
     {
