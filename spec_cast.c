@@ -11,7 +11,6 @@ Author: Pablo Prieto Torralbo <prietop@unican.es>
 #include <sys/wait.h>
 #include <sys/stat.h>
 #include <signal.h>
-#include <string.h>
 
 #include "m5ops.h"
 
@@ -21,18 +20,15 @@ int main (int argc, char **argv)
     printf("Máx number of processors: %d\n", max_num_processors);
 
     // GET OPTIONS
-    int c = 0;
-    int waiting = 1, gem5_work_op = 0, chdir_before_exec= 0;
+    int waiting = 1, gem5_work_op = 0;
 
     // options struct defined in gem5_spec_cast.h
 
-    int option_index = 0;
     char app[max_num_processors][MAX_APP_LENGTH];
     int sub_app[max_num_processors];
     char my_app[MAX_APP_LENGTH];
     char config[20] = "gem5";
     int my_sub_app;
-    int app_index=0;
     int num_processors=0;
     int num_apps=0;
     int num_loops=1;
@@ -41,125 +37,8 @@ int main (int argc, char **argv)
     static spec_barrier_t* my_barrier;
     char 	shm_name[] = "tmp_pthread_barrierattr_getpshared";
 
-    while (c >= 0)
-    {
-        c = getopt_long(argc, argv, "dwbp:n:l:c:", long_options, &option_index);
-
-        if(c == -1)
-            break;
-        switch (c)
-        {
-            case 0:
-            //long option with no arguments
-            printf ("App: %s\n", long_options[option_index].name);
-            /* If this option set a flag, do nothing else now (help). */
-            if (long_options[option_index].flag != 0)
-            break;
-            strcpy(app[app_index], long_options[option_index].name);
-            sub_app[app_index]=1;
-            app_index++;
-            break;
-
-            case 1:
-            //long option with required arguments
-            printf ("App: %s\n", long_options[option_index].name);
-            strcpy(app[app_index], long_options[option_index].name);
-            sub_app[app_index]=atoi(optarg);
-            if(sub_app[app_index]<=0)
-            {
-                fprintf(stderr, "\n*** ERROR *** Application \"%s\"", app[app_index]); 
-                fprintf(stderr, " requires benchmark number \n\n\n");
-                usage(argv[0]);
-                break;
-            }
-            printf("Using benchmark %d of %s\n", sub_app[app_index], app[app_index]);
-            app_index++;
-            break;
-
-            case 'd':
-            chdir_before_exec=1;
-            printf("Changing directory before execution\n");
-            break;
-
-            case 'w':
-            printf("Executing GEM5 work_begin op\n");
-            gem5_work_op=1;
-            break;
-
-            case 'b':
-            printf ("Background Execution\n");
-            waiting=0;
-            break;
-
-            case 'p':
-            num_processors=atoi(optarg);
-            printf("Number of processors %d\n", num_processors);
-            break;
-
-            case 'n':
-            num_apps=atoi(optarg);
-            printf("Number of applications %d\n", num_apps);
-            break;
-
-            case 'l':
-            num_loops=atoi(optarg);
-            printf("Number of loops in ROI: %d\n", num_loops);
-            break;
-
-            case 'c':
-            strcpy(config,optarg);
-            printf("Config name: %s\n", config);
-            break;
-
-            case '?':
-            /* getopt_long already printed an error message. */
-            break;
-
-            default:
-            abort ();
-        }
-    }
-
-    if (print_help)
-        usage(argv[0]);
-
-    if (app_index <= 0)
-    {
-        printf("\n** ERROR: No applications defined. Need at least one app **\n\n");
-        usage(argv[0]);
-    }
-
-    if(num_processors == 0)
-    {
-        num_processors = max_num_processors;
-        printf("Number of processors not defined, set to %d\n", num_processors);
-    } else if(num_processors > max_num_processors)
-    {
-        fprintf(stderr, "Number of processors set to %d and only %d available\n"
-        ,num_processors, max_num_processors);
-        return -1;
-    }
-    if(num_apps == 0)
-    {
-        num_apps = app_index;
-        printf("Number of applications not defined, set to %d\n", num_apps);
-    }
-    else
-    {
-        if(num_apps != app_index)
-        {
-            fprintf(stderr,"Only %d of %d apps have been specified\n",
-            app_index, num_apps);
-            return -1;
-        }
-    }
-
-    if (num_apps > num_processors)
-    {
-        fprintf(stderr, "Number of applications (%d) greater than the number of"
-        " processors (%d)\n", num_apps, num_processors);
-        return -1;
-    }
+    get_options(argc, argv, &waiting, &gem5_work_op, app, sub_app, config, 
+                &num_processors, &num_apps, &num_loops);
 
     pid_t child_pid;
     
@@ -190,17 +69,10 @@ int main (int argc, char **argv)
     // returning status of child processes
     int	status = 0;
     //struct sigaction act; //uncomment to use SIGALARM
-    char *cast_wd;
     char *new_wd;
     char *buf;
     size_t allocSize = sizeof(char) * MAX_CWD;
     buf = (char *)malloc(allocSize);
-
-    cast_wd = getcwd(buf, allocSize);
-    if (cast_wd == NULL) {
-        perror("getcwd");
-        exit(EXIT_FAILURE);
-    }
 
     /* Set up parent to handle SIGALRM */
     /*act.sa_flags = 0;
@@ -287,7 +159,7 @@ int main (int argc, char **argv)
 
     /* Fork a child process */
     proc=init_proc;
-    app_index=0;
+    int app_index=0;
     while(proc<(num_processors+init_proc))
     {
         pid[proc] = fork();
@@ -342,11 +214,6 @@ int main (int argc, char **argv)
     }
     else
     {
-        if (chdir(cast_wd) == -1) {
-            perror("cding to cast directory");
-            exit(EXIT_FAILURE);
-        }
-        printf("pwd : %s\n", cast_wd);
         fprintf(stderr, "%d executing %s %d\n", getpid(), my_app, my_sub_app);
         char my_cmd[4];
         sprintf(my_cmd, "%d", my_sub_app);

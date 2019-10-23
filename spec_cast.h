@@ -9,8 +9,11 @@ Author: Pablo Prieto Torralbo <prietop@unican.es>
 #include <stdlib.h>
 #include <errno.h>
 #include <stdbool.h>
+#include <papi.h>
 #include <sched.h> // linux
+#include <string.h>
 
+#define NUM_EVENTS 6
 #define MAX_CWD 80
 #define MAX_APP_LENGTH 20
 #define MAX_THREADS 128
@@ -25,7 +28,7 @@ static int print_help;
 
 static void usage(char *argv0) {
 
-  fprintf(stderr, "Usage: %s [-b] [-d] [-w] [-p number] [-n number] [-l number] "
+  fprintf(stderr, "Usage: %s [-b] [-d] [-w] [-r] [-p number] [-n number] [-l number] "
         "[-c config_name] --<prog> [number] [--<prog2> --<prog3> ...]\n", argv0);
   fprintf(stderr, "   prog is the program/s you want to cast. Some programs"
         " require an aditional param to indicate the benchmark number\n");
@@ -33,9 +36,6 @@ static void usage(char *argv0) {
         " to see the benchmarks available for each prog)\n");
   fprintf(stderr, "   -b makes %s to return immediately after launching the "
         "programs. The default is to wait for them to finish.\n", argv0);
-  fprintf(stderr, "   -d cd to the directory of the benchmark before running "
-        "the program. The directory should be the name of the program, for all "
-        "the programs.\n");
   fprintf(stderr, "   -p is the number of processors you want to use from the "
         "system (default value: the number of available processors in the "
         "system, i.e: %d)\n", max_num_processors);
@@ -126,3 +126,127 @@ static struct option long_options[] =
     {"help",      no_argument, &print_help, 1},
     {0, 0, 0, 0}
 };
+
+void get_options(int argc, char** argv, int* waiting, int* gem5_work_op, char (*app)[MAX_APP_LENGTH], 
+      int* sub_app, char* config, int* num_processors, int* num_apps, int* num_loops)
+{
+    int option_index = 0;
+    int app_index=0;
+    int c = 0;
+
+      
+    while (c >= 0)
+    {
+        c = getopt_long(argc, argv, "dwbp:n:l:c:", long_options, &option_index);
+
+        if(c == -1)
+            break;
+        switch (c)
+        {
+            case 0:
+            //long option with no arguments
+            printf ("App: %s\n", long_options[option_index].name);
+            /* If this option set a flag, do nothing else now (help). */
+            if (long_options[option_index].flag != 0)
+            break;
+            strcpy(app[app_index], long_options[option_index].name);
+            sub_app[app_index]=1;
+            app_index++;
+            break;
+
+            case 1:
+            //long option with required arguments
+            printf ("App: %s\n", long_options[option_index].name);
+            strcpy(app[app_index], long_options[option_index].name);
+            sub_app[app_index]=atoi(optarg);
+            if(sub_app[app_index]<=0)
+            {
+                fprintf(stderr, "\n*** ERROR *** Application \"%s\"", app[app_index]); 
+                fprintf(stderr, " requires benchmark number \n\n\n");
+                usage(argv[0]);
+                break;
+            }
+            printf("Using benchmark %d of %s\n", sub_app[app_index], app[app_index]);
+            app_index++;
+            break;
+
+            case 'w':
+            printf("Executing GEM5 work_begin op\n");
+            *gem5_work_op=1;
+            break;
+
+            case 'b':
+            printf ("Background Execution\n");
+            *waiting=0;
+            break;
+
+            case 'p':
+            *num_processors=atoi(optarg);
+            printf("Number of processors %d\n", *num_processors);
+            break;
+
+            case 'n':
+            *num_apps=atoi(optarg);
+            printf("Number of applications %d\n", *num_apps);
+            break;
+
+            case 'l':
+            *num_loops=atoi(optarg);
+            printf("Number of loops in ROI: %d\n", *num_loops);
+            break;
+
+            case 'c':
+            strcpy(config,optarg);
+            printf("Config name: %s\n", config);
+            break;
+
+            case '?':
+            /* getopt_long already printed an error message. */
+            break;
+
+            default:
+            abort ();
+        }
+    }
+
+    if (print_help)
+        usage(argv[0]);
+
+    if (app_index <= 0)
+    {
+        printf("\n** ERROR: No applications defined. Need at least one app **\n\n");
+        usage(argv[0]);
+    }
+
+    if(*num_processors == 0)
+    {
+        *num_processors = max_num_processors;
+        printf("Number of processors not defined, set to %d\n", *num_processors);
+    } else if(*num_processors > max_num_processors)
+    {
+        fprintf(stderr, "Number of processors set to %d and only %d available\n"
+        ,*num_processors, max_num_processors);
+        exit(-1);
+    }
+    if(*num_apps == 0)
+    {
+        *num_apps = app_index;
+        printf("Number of applications not defined, set to %d\n", *num_apps);
+    }
+    else
+    {
+        if(*num_apps != app_index)
+        {
+            fprintf(stderr,"Only %d of %d apps have been specified\n",
+            app_index, *num_apps);
+            exit(-1);
+        }
+    }
+
+    if (*num_apps > *num_processors)
+    {
+        fprintf(stderr, "Number of applications (%d) greater than the number of"
+        " processors (%d)\n", *num_apps, *num_processors);
+        exit(-1);
+    }
+}
