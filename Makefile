@@ -1,8 +1,9 @@
 CC=gcc
-CFLAGS=-pthread -lrt -DM5OP_ADDR=0xFFFF0000
+CFLAGS= -DM5OP_ADDR=0xFFFF0000
 SFLAGS= -DM5OP_ADDR=0xFFFF0000
 # Final run:
 CFLAGS += -O2
+LDFLAGS += -pthread -lrt /usr/local/lib/libpapi.a
 
 OBJ           ?= .o
 
@@ -22,5 +23,5 @@ clean:
 %$(OBJ): %.S
 	$(CC) $(OBJOPT) $(SFLAGS) $<
 
-spec_cast: spec_cast.o m5_mapMem_c.o m5op_x86_c.o
-	${CC} ${CFLAGS} -o spec_cast spec_cast.o m5_mapMem_c.o m5op_x86_c.o
+spec_cast: spec_cast.o m5_mapMem_c.o m5op_x86_c.o spec_cast.h
+	${CC} ${CFLAGS} -o spec_cast spec_cast.o m5_mapMem_c.o m5op_x86_c.o ${LDFLAGS}

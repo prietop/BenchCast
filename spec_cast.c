@@ -5,7 +5,6 @@ Author: Pablo Prieto Torralbo <prietop@unican.es>
 #include "spec_cast.h"
 
 #include <pthread.h>
-#include <unistd.h>
 #include <sys/mman.h>
 #include <fcntl.h>
 #include <sys/wait.h>
@@ -20,10 +19,9 @@ int main (int argc, char **argv)
     printf("Máx number of processors: %d\n", max_num_processors);
 
     // GET OPTIONS
-    int waiting = 1, gem5_work_op = 0;
+    int waiting = 1, gem5_work_op = 0, use_papi=0, i=0;
 
-    // options struct defined in gem5_spec_cast.h
-
+    // options struct defined in spec_cast.h
     char app[max_num_processors][MAX_APP_LENGTH];
     int sub_app[max_num_processors];
     char my_app[MAX_APP_LENGTH];
@@ -32,14 +30,30 @@ int main (int argc, char **argv)
     int num_processors=0;
     int num_apps=0;
     int num_loops=1;
+    int num_papi_loops=NUM_EVENT_LOOPS;
+    int num_secs=SLEEP_SECONDS;
 
     int *pid;
     static spec_barrier_t* my_barrier;
-    char 	shm_name[] = "tmp_pthread_barrierattr_getpshared";
 
-    get_options(argc, argv, &waiting, &gem5_work_op, app, sub_app, config, 
+    get_options(argc, argv, &waiting, &gem5_work_op, &use_papi, app, sub_app, config, 
                 &num_processors, &num_apps, &num_loops);
 
+    if(use_papi == 1)
+    {
+        struct stat st;
+        filename = (char *)malloc(MAX_CWD * sizeof(char));
+        if (stat(papi_dir, &st) == -1) {
+           mkdir(papi_dir, 0777);
+        }
+        sprintf(filename, "%s/out-%d-", papi_dir, num_processors);
+        for (i = 0; i < num_apps; i++)
+        {
+            strcat(filename, app[i]);
+            strcat(filename, "-");
+        }
+        strcat(filename, ".txt");
+    }
     pid_t child_pid;
     
     if (gem5_work_op > 0)
@@ -251,7 +265,16 @@ int main (int argc, char **argv)
         , getpid());
     }
 
-    if(pid[proc] != 0 && waiting==1)
+    if(pid[proc] != 0 && use_papi == 1)
+    {
+        //call PAPI (defined in .h)
+        do_papi(num_papi_loops, num_secs);
+        printf("PAPI ENDED\n");
+        fflush(stdout);
+        fflush(stderr);
+        kill(0,SIGKILL);
+        return 0;
+    } else if(pid[proc] != 0 && waiting==1)
     {
         /* parent */
         for(proc=0;proc<num_processors;proc++)
@@ -294,7 +317,7 @@ int main (int argc, char **argv)
         fflush(stdout);
         fflush(stderr);
         return 0;
-    }else
+    } else
     {
         fprintf(stderr,"Finished %d\n", getpid());
         fflush(stderr);
