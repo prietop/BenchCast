@@ -19,7 +19,7 @@ int main (int argc, char **argv)
     printf("Máx number of processors: %d\n", max_num_processors);
 
     // GET OPTIONS
-    int waiting = 1, gem5_work_op = 0, use_papi=0, i=0;
+    int waiting = 1, gem5_work_op = 0, use_papi=0, i=0, use_csv=0;
 
     // options struct defined in spec_cast.h
     char app[max_num_processors][MAX_APP_LENGTH];
@@ -36,24 +36,24 @@ int main (int argc, char **argv)
     int *pid;
     static spec_barrier_t* my_barrier;
 
-    get_options(argc, argv, &waiting, &gem5_work_op, &use_papi, app, sub_app, config, 
-                &num_processors, &num_apps, &num_loops);
-
-    if(use_papi == 1)
+    filename = (char *)malloc(MAX_CWD * sizeof(char));
+    struct stat st;
+    if (stat(papi_dir, &st) == -1)
     {
-        struct stat st;
-        filename = (char *)malloc(MAX_CWD * sizeof(char));
-        if (stat(papi_dir, &st) == -1) {
-           mkdir(papi_dir, 0777);
-        }
-        sprintf(filename, "%s/out-%d-", papi_dir, num_processors);
-        for (i = 0; i < num_apps; i++)
-        {
-            strcat(filename, app[i]);
-            strcat(filename, "-");
-        }
-        strcat(filename, ".txt");
+        mkdir(papi_dir, 0777);
     }
+    sprintf(filename, "%s/out-%d-", papi_dir, num_processors);
+    for (i = 0; i < num_apps; i++)
+    {
+        strcat(filename, app[i]);
+        strcat(filename, "-");
+    }
+    strcat(filename, ".txt");
+    csv_filename = (char *)malloc(MAX_CWD * sizeof(char));
+
+    get_options(argc, argv, &waiting, &gem5_work_op, &use_papi, app, sub_app, config, 
+                &num_processors, &num_apps, &num_loops, &use_csv, &num_secs);
+
     pid_t child_pid;
     
     if (gem5_work_op > 0)
@@ -172,9 +172,9 @@ int main (int argc, char **argv)
     }
 
     /* Fork a child process */
-    proc=init_proc;
+    proc=0;
     int app_index=0;
-    while(proc<(num_processors+init_proc))
+    while(proc<num_processors)
     {
         pid[proc] = fork();
         if(pid[proc] == -1)
@@ -185,7 +185,7 @@ int main (int argc, char **argv)
         else if(pid[proc] == 0)
         {
             //child (SPEC app)
-            bind_pid(proc, getpid());
+            bind_pid(proc+init_proc, getpid());
             strcpy(my_app, app[app_index]);
             my_sub_app = sub_app[app_index];
             break;
@@ -268,11 +268,31 @@ int main (int argc, char **argv)
     if(pid[proc] != 0 && use_papi == 1)
     {
         //call PAPI (defined in .h)
-        do_papi(num_papi_loops, num_secs);
+        printf("Starting PAPI measures %d each %ds\n", num_papi_loops, num_secs);
+        do_papi(num_papi_loops, num_secs, pid, num_processors, app, num_apps,use_csv);
         printf("PAPI ENDED\n");
         fflush(stdout);
         fflush(stderr);
-        kill(0,SIGKILL);
+        for(proc=0; proc<num_processors; proc++)
+        {
+            kill(pid[proc], SIGKILL);
+            child_pid=wait(&status);
+            if( child_pid == -1)
+            {
+                printf("[W] parent: error at waitpid()\n");
+                return -3;
+            }
+            if(!WIFEXITED(status))
+            {
+                printf("[W] Child %d exited abnormally\n", pid[proc]);
+                return -3;
+            }
+
+            if(WEXITSTATUS(status))
+            {
+                printf("[I] %d status = %d\n", child_pid, status);
+            }
+        }
         return 0;
     } else if(pid[proc] != 0 && waiting==1)
     {
