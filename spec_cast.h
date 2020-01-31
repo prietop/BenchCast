@@ -297,13 +297,11 @@ void get_options(int argc, char** argv, int* waiting, int* gem5_work_op, int* us
     }
 }
 
-void do_papi(int num_papi_loops, int num_secs, pid_t* pids, int num_procs, char (*apps)[MAX_APP_LENGTH], int num_apps, int use_csv)
+void init_papi(int num_papi_loops, pid_t* pids, int num_procs, char (*apps)[MAX_APP_LENGTH], int num_apps, int* EventSet)
 {
-      int retval, EventSet[num_procs];
-      long_long values[num_procs][4];
+      int retval;
       int i=0, count=0;
       pid_t temp_pid=0;
-      FILE *fp, *cfp;
 
       for(i=0; i<num_procs; i++)
       {
@@ -367,6 +365,18 @@ void do_papi(int num_papi_loops, int num_secs, pid_t* pids, int num_procs, char 
                   fprintf(stderr, "Error in PAPI_attach\n");
                   handle_error(retval);
             }
+            printf("PAPI initialization done\n");
+}
+
+void do_papi(int num_papi_loops, int num_secs, pid_t* pids, int num_procs, char (*apps)[MAX_APP_LENGTH], int num_apps, int use_csv, int* EventSet)
+{
+      int retval;
+      unsigned long_long values[num_procs][4];
+      int i=0, count=0;
+      FILE *fp, *cfp;
+
+      for(i=0; i<num_procs; i++)
+      {
             retval=PAPI_start(EventSet[i]);
             if (retval != PAPI_OK)
             {

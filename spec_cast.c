@@ -218,7 +218,7 @@ int main (int argc, char **argv)
         printf("Child process %d in processor %d\n", (int)getpid(), proc);
     }
     */
-
+    int EventSet[num_processors];
     rc = -1;
     int numWaits=0;
     if(pid[proc]!=0 && waiting==1)
@@ -227,6 +227,10 @@ int main (int argc, char **argv)
         {
             fprintf(stderr,"Parent Waiting %d\n", numWaits);
             rc = pthread_barrier_wait(&my_barrier->barrier);
+            if(numWaits == 0 && use_papi == 1)
+            {
+                init_papi(num_papi_loops, pid, num_processors, app, num_apps, &EventSet)
+            }
             numWaits++;
             if(numWaits>=num_loops)
             { my_barrier->doWait=false; }
@@ -280,7 +284,7 @@ int main (int argc, char **argv)
     {
         //call PAPI (defined in .h)
         printf("Starting PAPI measures %d each %ds\n", num_papi_loops, num_secs);
-        do_papi(num_papi_loops, num_secs, pid, num_processors, app, num_apps,use_csv);
+        do_papi(num_papi_loops, num_secs, pid, num_processors, app, num_apps,use_csv, &EventSet);
         printf("PAPI ENDED\n");
         fflush(stdout);
         fflush(stderr);
