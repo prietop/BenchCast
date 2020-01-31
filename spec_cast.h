@@ -336,7 +336,6 @@ void do_papi(int num_papi_loops, int num_secs, pid_t* pids, int num_procs, char 
                   
             } while(temp_pid > 0);
       }
-
       retval = PAPI_library_init(PAPI_VER_CURRENT);
       if(retval != PAPI_VER_CURRENT && retval > 0)
       {
@@ -364,11 +363,16 @@ void do_papi(int num_papi_loops, int num_secs, pid_t* pids, int num_procs, char 
             /* Attach this EventSet to the forked process */
             retval=PAPI_attach(EventSet[i], pids[i]);
             if (retval != PAPI_OK)
+            {
+                  fprintf(stderr, "Error in PAPI_attach\n");
                   handle_error(retval);
-
+            }
             retval=PAPI_start(EventSet[i]);
             if (retval != PAPI_OK)
+            {
+                  fprintf(stderr, "Error in PAPI_start\n");
                   handle_error(retval);
+            }
             else
             {
                   printf("Starting PAPI %d(PID:%d): %d times %d\n", 

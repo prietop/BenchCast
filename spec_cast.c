@@ -11,8 +11,9 @@ Author: Pablo Prieto Torralbo <prietop@unican.es>
 #include <sys/stat.h>
 #include <signal.h>
 
+#ifdef GEM5
 #include "m5ops.h"
-
+#endif
 int main (int argc, char **argv)
 {
     max_num_processors = sysconf(_SC_NPROCESSORS_ONLN);
@@ -60,7 +61,12 @@ int main (int argc, char **argv)
     {
         // M5 OP intitialization
         // Assume gem5 uses kvm to create checkpoints
+#ifdef GEM5        
         map_m5_mem();
+#else
+        fprintf(stderr, "[W] Using m5 ops without compiling with DGEM5");
+        exit(-1);
+#endif
     }
 
     /* Make sure there is process-shared capability. */
@@ -246,7 +252,12 @@ int main (int argc, char **argv)
     if(pid[proc] != 0 && gem5_work_op>0)
     {
         //execute m5_work_begin_op
+#ifdef GEM5
         m5_work_begin(0);
+#else
+        fprintf(stderr, "[W] Using m5 ops without compiling with DGEM5");
+        exit(-1);
+#endif
     }
 
     if(rc != 0 && rc != PTHREAD_BARRIER_SERIAL_THREAD)
