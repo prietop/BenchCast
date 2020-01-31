@@ -229,7 +229,7 @@ int main (int argc, char **argv)
             rc = pthread_barrier_wait(&my_barrier->barrier);
             if(numWaits == 0 && use_papi == 1)
             {
-                init_papi(num_papi_loops, pid, num_processors, app, num_apps, &EventSet)
+                init_papi(num_papi_loops, pid, num_processors, app, num_apps, EventSet);
             }
             numWaits++;
             if(numWaits>=num_loops)
@@ -284,7 +284,7 @@ int main (int argc, char **argv)
     {
         //call PAPI (defined in .h)
         printf("Starting PAPI measures %d each %ds\n", num_papi_loops, num_secs);
-        do_papi(num_papi_loops, num_secs, pid, num_processors, app, num_apps,use_csv, &EventSet);
+        do_papi(num_papi_loops, num_secs, pid, num_processors, app, num_apps,use_csv, EventSet);
         printf("PAPI ENDED\n");
         fflush(stdout);
         fflush(stderr);

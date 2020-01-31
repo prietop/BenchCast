@@ -365,7 +365,8 @@ void init_papi(int num_papi_loops, pid_t* pids, int num_procs, char (*apps)[MAX_
                   fprintf(stderr, "Error in PAPI_attach\n");
                   handle_error(retval);
             }
-            printf("PAPI initialization done\n");
+      }
+      printf("PAPI initialization done\n");
 }
 
 void do_papi(int num_papi_loops, int num_secs, pid_t* pids, int num_procs, char (*apps)[MAX_APP_LENGTH], int num_apps, int use_csv, int* EventSet)
