@@ -1,11 +1,15 @@
 CC=gcc
-CFLAGS= -DM5OP_ADDR=0xFFFF0000
-SFLAGS= -DM5OP_ADDR=0xFFFF0000
+CFLAGS=
+SFLAGS= 
+OBJ = spec_cast.o 
+ifdef GEM5
+CFLAGS += -DM5OP_ADDR=0xFFFF0000
+SFLAGS += -DM5OP_ADDR=0xFFFF0000
+OBJ += m5_mapMem_c.o m5op_x86_c.o
+endif
 # Final run:
 CFLAGS += -O2
 LDFLAGS += -pthread -lrt /usr/local/lib/libpapi.a
-
-OBJ           ?= .o
 
 OBJOPT        ?= -c -o $@
 # or, if you want debugging:
@@ -13,15 +17,15 @@ OBJOPT        ?= -c -o $@
 
 all: spec_cast
 clean:
-	rm -f spec_cast.o m5_mapMem_c.o spec_cast m5op_x86_c.o
+	rm -f ${OBJ} spec_cast
 
 # C
-%$(OBJ): %.c
+%.o: %.c
 	$(CC) $(OBJOPT) $(CFLAGS) $<
 
 # S
-%$(OBJ): %.S
+%.o: %.S
 	$(CC) $(OBJOPT) $(SFLAGS) $<
 
-spec_cast: spec_cast.o m5_mapMem_c.o m5op_x86_c.o spec_cast.h
-	${CC} ${CFLAGS} -o spec_cast spec_cast.o m5_mapMem_c.o m5op_x86_c.o ${LDFLAGS}
+spec_cast: ${OBJ}
+	${CC} ${CFLAGS} -o spec_cast ${OBJ} ${LDFLAGS}
