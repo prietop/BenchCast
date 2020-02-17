@@ -100,13 +100,6 @@ static void bind_pid (int cpu_num, pid_t PID_NUM)
     }
 }
 
-void sig_handler()
-{
-    printf("[E] Interrupted by SIGALRM\n");
-    printf("[E] Test Fail: block on pthread_barrier_wait()\n");
-    exit(-1);
-}
-
 static struct option long_options[] =
 {
     /* These options set a flag. */
@@ -319,7 +312,9 @@ void init_papi(int num_papi_loops, pid_t* pids, int num_procs, char (*apps)[MAX_
                   strcat(str,ppid);
                   strcat(str," | grep -v PID");
                   FILE *pfp = popen(str, "r");
-                  fscanf(pfp, "%d", &temp_pid);
+                  retval=fscanf(pfp, "%d", &temp_pid);
+                  if(retval==EOF)
+                        break;
                   pclose(pfp);
                   printf("Read %d\n", temp_pid);
                   if((temp_pid > 0 && temp_pid != pids[i]))
@@ -335,7 +330,7 @@ void init_papi(int num_papi_loops, pid_t* pids, int num_procs, char (*apps)[MAX_
             } while(temp_pid > 0);
       }
       retval = PAPI_library_init(PAPI_VER_CURRENT);
-      if(retval != PAPI_VER_CURRENT && retval > 0)
+      if(retval != PAPI_VER_CURRENT)
       {
             fprintf(stderr,"Error in PAPI_library_init\n");
             handle_error(retval);
@@ -372,7 +367,7 @@ void init_papi(int num_papi_loops, pid_t* pids, int num_procs, char (*apps)[MAX_
 void do_papi(int num_papi_loops, int num_secs, pid_t* pids, int num_procs, char (*apps)[MAX_APP_LENGTH], int num_apps, int use_csv, int* EventSet)
 {
       int retval;
-      unsigned long_long values[num_procs][4];
+      long long values[num_procs][4];
       int i=0, count=0;
       FILE *fp, *cfp;
 
@@ -437,28 +432,28 @@ void do_papi(int num_papi_loops, int num_secs, pid_t* pids, int num_procs, char 
       {
             if (PAPI_stop(EventSet[i], values[i]) != PAPI_OK)
                   handle_error(4);
-                  if (values[i][3] > 0)
-                        miss_rate = ((float)values[i][2]) / ((float)values[i][3]);
-                  if (values[i][0] > 0)
-                        ipc = ((float)values[i][1]) / ((float)values[i][0]);
-                  if (values[i][1] > 0)
-                        mpki = 1000.0*(((float)values[i][2]) / ((float)values[i][1]));
-                  fprintf(fp, "END %d, PID:%d - %s\n", count, pids[i], apps[i%num_apps]);
-                  fprintf(fp, "Final %d-%s Cycles %lld\n", count, apps[i%num_apps], values[i][0]);
-                  fprintf(fp, "Final %d-%s Instructions %lld\n", count, apps[i%num_apps], values[i][1]);
-                  fprintf(fp, "Final %d-%s L3 misses %lld\n", count, apps[i%num_apps], values[i][2]);
-                  fprintf(fp, "Final %d-%s L3 accesses %lld\n", count, apps[i%num_apps], values[i][3]);
-                  fprintf(fp, "Final %d-%s L3 Miss rate %.5f\n", count, apps[i%num_apps], miss_rate);
-                  fprintf(fp, "Final %d-%s L3 MPKI %.5f\n", count, apps[i%num_apps], mpki);
-                  fprintf(fp, "Final %d-%s IPC %.5f\n", count, apps[i%num_apps], ipc);
-                  fprintf(fp, "********************\n\n");
-                  if(use_csv==1)
-                  {
-                     fprintf(cfp, "CPU%d;%d;%lld;;instructions;%s\n", i,count,values[i][1],apps[i%num_apps]);
-                     fprintf(cfp, "CPU%d;%d;%lld;;cycles;%s\n", i,count,values[i][0],apps[i%num_apps]);
-                     fprintf(cfp, "CPU%d;%d;%.8f;;miss_rate;%s\n", i,count,miss_rate,apps[i%num_apps]);
-                     fprintf(cfp, "CPU%d;%d;%.8f;;MPKI;%s\n", i,count,mpki,apps[i%num_apps]);
-                  }
+            if (values[i][3] > 0)
+                  miss_rate = ((float)values[i][2]) / ((float)values[i][3]);
+            if (values[i][0] > 0)
+                  ipc = ((float)values[i][1]) / ((float)values[i][0]);
+            if (values[i][1] > 0)
+                  mpki = 1000.0*(((float)values[i][2]) / ((float)values[i][1]));
+            fprintf(fp, "END %d, PID:%d - %s\n", count, pids[i], apps[i%num_apps]);
+            fprintf(fp, "Final %d-%s Cycles %lld\n", count, apps[i%num_apps], values[i][0]);
+            fprintf(fp, "Final %d-%s Instructions %lld\n", count, apps[i%num_apps], values[i][1]);
+            fprintf(fp, "Final %d-%s L3 misses %lld\n", count, apps[i%num_apps], values[i][2]);
+            fprintf(fp, "Final %d-%s L3 accesses %lld\n", count, apps[i%num_apps], values[i][3]);
+            fprintf(fp, "Final %d-%s L3 Miss rate %.5f\n", count, apps[i%num_apps], miss_rate);
+            fprintf(fp, "Final %d-%s L3 MPKI %.5f\n", count, apps[i%num_apps], mpki);
+            fprintf(fp, "Final %d-%s IPC %.5f\n", count, apps[i%num_apps], ipc);
+            fprintf(fp, "********************\n\n");
+            if(use_csv==1)
+            {
+                  fprintf(cfp, "CPU%d;%d;%lld;;instructions;%s\n", i,count,values[i][1],apps[i%num_apps]);
+                  fprintf(cfp, "CPU%d;%d;%lld;;cycles;%s\n", i,count,values[i][0],apps[i%num_apps]);
+                  fprintf(cfp, "CPU%d;%d;%.8f;;miss_rate;%s\n", i,count,miss_rate,apps[i%num_apps]);
+                  fprintf(cfp, "CPU%d;%d;%.8f;;MPKI;%s\n", i,count,mpki,apps[i%num_apps]);
+            }
       }
       if(fflush(fp))
             perror("fflush error\n");

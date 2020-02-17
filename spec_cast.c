@@ -43,13 +43,6 @@ int main (int argc, char **argv)
     {
         mkdir(papi_dir, 0777);
     }
-    sprintf(filename, "%s/out-%d-", papi_dir, num_processors);
-    for (i = 0; i < num_apps; i++)
-    {
-        strcat(filename, app[i]);
-        strcat(filename, "-");
-    }
-    strcat(filename, ".txt");
     csv_filename = (char *)malloc(MAX_CWD * sizeof(char));
 
     get_options(argc, argv, &waiting, &gem5_work_op, &use_papi, app, sub_app, config, 
@@ -88,17 +81,6 @@ int main (int argc, char **argv)
     int	    rc;
     // returning status of child processes
     int	status = 0;
-    //struct sigaction act; //uncomment to use SIGALARM
-    char *new_wd;
-    char *buf;
-    size_t allocSize = sizeof(char) * MAX_CWD;
-    buf = (char *)malloc(allocSize);
-
-    /* Set up parent to handle SIGALRM */
-    /*act.sa_flags = 0;
-    act.sa_handler = sig_handler;
-    sigfillset(&act.sa_mask);
-    sigaction(SIGALRM, &act, 0);*/
 
     /* Initialize a barrier attributes object */
     if(pthread_barrierattr_init(&ba) != 0)
@@ -251,6 +233,11 @@ int main (int argc, char **argv)
         }
         fprintf(stderr, "\n");
         rc = execv("./launch_spec.py", prog);
+        if(rc<0)
+        {
+            fprintf(stderr,"Error execv\n");
+            exit(rc);
+        }
     }
 
     if(pid[proc] != 0 && gem5_work_op>0)
