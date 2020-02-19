@@ -14,14 +14,12 @@ Author: Pablo Prieto Torralbo <prietop@unican.es>
 #include <string.h>
 #include <unistd.h>
 
-#define NUM_EVENTS 6
 #define MAX_CWD 600
 #define MAX_APP_LENGTH 20
 #define MAX_THREADS 128
 #define SLEEP_SECONDS 60
-#define NUM_EVENT_LOOPS 1
+#define DEFAULT_PAPI_LOOPS 1
 static const char shm_name[] = "tmp_pthread_barrierattr_getpshared";
-static const char papi_dir[] = "papi-results";
 
 typedef struct spec_barrier {
    pthread_barrier_t barrier;
@@ -30,13 +28,11 @@ typedef struct spec_barrier {
 
 static int max_num_processors;
 static int print_help;
-char *filename;
-char *csv_filename;
 
 static void usage(char *argv0) {
 
   fprintf(stderr, "Usage: %s [-b] [-d] [-w] [-p number] [-n number] [-l number] "
-        "[-c config_name] [-v csv_filename] [-o outputfile] [-s seconds] "
+        "[-c config_name] [-v csv_filename] [-s seconds] [-r number]"
         "--<prog> [number] [--<prog2> [number] --<prog3> ...]\n", argv0);
   fprintf(stderr, "   prog is the program/s you want to cast. Some programs"
         " require an aditional param to indicate the benchmark number\n");
@@ -51,13 +47,14 @@ static void usage(char *argv0) {
         "m5_work_begin_op\n");
   fprintf(stderr, "   -s use papi library to analyze performance counters during "
          "N seconds\n");
-  fprintf(stderr, "   -c print papi results in a csv file (ASUME USING PAPI)\n");
-  fprintf(stderr, "   -o output file name (ASUME USING PAPI)\n");
+  fprintf(stderr, "   -c SPEC config name\n");
+  fprintf(stderr, "   -v print papi results in a csv file (ASUME USING PAPI)\n");
+  fprintf(stderr, "   -r repeat papi measures N times (ASUME USING PAPI, and csv output)\n");
   fprintf(stderr, "   -n Number of different programs to run. It defaults to the"
         " number of progs arguments passed. Should be used as a control\n");
   fprintf(stderr, "   -l Number of times the main loop of the ROI should be"
         " executed before the creation of the checkpoint (end of spec_cast)\n");
-  fprintf(stderr, "        %s -d -p 8 -n 2 -l 2 --mcf --bwaves 2\n", argv0);
+  fprintf(stderr, "        %s -c spec-cast -d -p 8 -n 2 -l 2 --mcf --bwaves 2\n", argv0);
   fprintf(stderr, "      will run 4 instances of \"mcf \" and 4 instances of"
         " \"bwaves\" (with input bwaves_2) and stop after 2 loops of the ROI\n");
   fprintf(stderr, "\n");
@@ -141,7 +138,8 @@ void handle_error (int retval)
 }
 
 void get_options(int argc, char** argv, int* waiting, int* gem5_work_op, int* use_papi, char (*app)[MAX_APP_LENGTH], 
-      int* sub_app, char* config, int* num_processors, int* num_apps, int* num_loops, int* use_csv, int* sleep_sec)
+      int* sub_app, char* config, int* num_processors, int* num_apps, int* num_loops, int* use_csv, int* sleep_sec, 
+      int* num_papi_loops, char* csv_filename)
 {
     int option_index = 0;
     int app_index=0;
@@ -149,7 +147,7 @@ void get_options(int argc, char** argv, int* waiting, int* gem5_work_op, int* us
       
     while (c >= 0)
     {
-        c = getopt_long(argc, argv, "wbp:n:l:c:v:o:s:", long_options, &option_index);
+        c = getopt_long(argc, argv, "wbp:n:l:c:v:s:r:", long_options, &option_index);
 
         if(c == -1)
             break;
@@ -229,14 +227,20 @@ void get_options(int argc, char** argv, int* waiting, int* gem5_work_op, int* us
             printf("CSV file name: %s\n", csv_filename);
             break;
 
-            case 'o':
+            case 'r':
+            if(*use_csv==0)
+            {
+                  fprintf(stderr,"WARNING! -r option without CSV file (-v option)\n");  
+                  usage(argv[0]);
+                  exit(1);
+            }
             if(*use_papi==0)
             {      
                   *use_papi=1;
-                  fprintf(stderr,"WARNING! Using PAPI due to -o option\n");
+                  fprintf(stderr,"WARNING! Using PAPI due to -r option\n");
             }
-            strcpy(filename,optarg);
-            printf("Output file name: %s\n", filename);
+            *num_papi_loops=atoi(optarg);
+            printf("Periodic PAPI measure: %d times", *num_papi_loops);
             break;
 
             case '?':
@@ -364,12 +368,14 @@ void init_papi(int num_papi_loops, pid_t* pids, int num_procs, char (*apps)[MAX_
       printf("PAPI initialization done\n");
 }
 
-void do_papi(int num_papi_loops, int num_secs, pid_t* pids, int num_procs, char (*apps)[MAX_APP_LENGTH], int num_apps, int use_csv, int* EventSet)
+void do_papi(int num_papi_loops, int num_secs, pid_t* pids, int num_procs, char (*apps)[MAX_APP_LENGTH], int num_apps, 
+            int use_csv, int* EventSet, char* csv_filename)
 {
       int retval;
       long long values[num_procs][4];
       int i=0, count=0;
-      FILE *fp, *cfp;
+      FILE *cfp, *pcfp;
+      char periodic_filename[MAX_CWD];
 
       for(i=0; i<num_procs; i++)
       {
@@ -386,12 +392,6 @@ void do_papi(int num_papi_loops, int num_secs, pid_t* pids, int num_procs, char 
             }
       }
 
-      fp = fopen(filename, "w+");
-      if(fp == NULL)
-      {
-            fprintf(stderr, "Error opening file %s\n", filename);
-            handle_error(1);
-      }
       if(use_csv)
       {
             cfp = fopen(csv_filename, "w+");
@@ -399,6 +399,17 @@ void do_papi(int num_papi_loops, int num_secs, pid_t* pids, int num_procs, char 
             {
                   fprintf(stderr, "Error opening file %s\n", csv_filename);
                   handle_error(1);
+            }
+            if(num_papi_loops>1)
+            {
+                  strcpy(periodic_filename,csv_filename);
+                  strcpy(periodic_filename,".periodic.csv");
+                  pcfp = fopen(periodic_filename, "w+");
+                  if(pcfp == NULL)
+                  {
+                        fprintf(stderr, "Error opening file %s\n", periodic_filename);
+                        handle_error(1);
+                  }
             }
       }
       float miss_rate = 0.0, ipc = 0.0, mpki = 0.0;
@@ -416,15 +427,26 @@ void do_papi(int num_papi_loops, int num_secs, pid_t* pids, int num_procs, char 
                         ipc = ((float)values[i][1]) / ((float)values[i][0]);
                   if (values[i][1] > 0)
                         mpki = 1000.0*(((float)values[i][2]) / ((float)values[i][1]));
-                  fprintf(fp, "Loop %d, PID:%d - %s\n", count, pids[i], apps[i%num_apps]);
-                  fprintf(fp, "%d-%s Cycles %lld\n", count, apps[i%num_apps], values[i][0]);
-                  fprintf(fp, "%d-%s Instructions %lld\n", count, apps[i%num_apps], values[i][1]);
-                  fprintf(fp, "%d-%s L3 misses %lld\n", count, apps[i%num_apps], values[i][2]);
-                  fprintf(fp, "%d-%s L3 accesses %lld\n", count, apps[i%num_apps], values[i][3]);
-                  fprintf(fp, "%d-%s L3 Miss rate %.5f\n", count, apps[i%num_apps], miss_rate);
-                  fprintf(fp, "%d-%s L3 MPKI %.5f\n", count, apps[i%num_apps], mpki);
-                  fprintf(fp, "%d-%s IPC %.5f\n", count, apps[i%num_apps], ipc);
-                  fprintf(fp, "********************\n\n");
+                  if(use_csv==1 && num_papi_loops>1)
+                  {
+                        fprintf(pcfp, "CPU%d;%d;%lld;;instructions;%s\n", i,count,values[i][1],apps[i%num_apps]);
+                        fprintf(pcfp, "CPU%d;%d;%lld;;cycles;%s\n", i,count,values[i][0],apps[i%num_apps]);
+                        fprintf(pcfp, "CPU%d;%d;%.8f;;miss_rate;%s\n", i,count,miss_rate,apps[i%num_apps]);
+                        fprintf(pcfp, "CPU%d;%d;%.8f;;MPKI;%s\n", i,count,mpki,apps[i%num_apps]);
+                  } else
+                  {
+                        printf("Loop %d, PID:%d - %s\n", count, pids[i], apps[i%num_apps]);
+                        printf("%d-%s Cycles %lld\n", count, apps[i%num_apps], values[i][0]);
+                        printf("%d-%s Instructions %lld\n", count, apps[i%num_apps], values[i][1]);
+                        printf("%d-%s L3 misses %lld\n", count, apps[i%num_apps], values[i][2]);
+                        printf("%d-%s L3 accesses %lld\n", count, apps[i%num_apps], values[i][3]);
+                        printf("%d-%s L3 Miss rate %.5f\n", count, apps[i%num_apps], miss_rate);
+                        printf("%d-%s L3 MPKI %.5f\n", count, apps[i%num_apps], mpki);
+                        printf("%d-%s IPC %.5f\n", count, apps[i%num_apps], ipc);
+                        printf("********************\n\n");
+                  }
+                  
+                  
             }
       }
 
@@ -438,15 +460,6 @@ void do_papi(int num_papi_loops, int num_secs, pid_t* pids, int num_procs, char 
                   ipc = ((float)values[i][1]) / ((float)values[i][0]);
             if (values[i][1] > 0)
                   mpki = 1000.0*(((float)values[i][2]) / ((float)values[i][1]));
-            fprintf(fp, "END %d, PID:%d - %s\n", count, pids[i], apps[i%num_apps]);
-            fprintf(fp, "Final %d-%s Cycles %lld\n", count, apps[i%num_apps], values[i][0]);
-            fprintf(fp, "Final %d-%s Instructions %lld\n", count, apps[i%num_apps], values[i][1]);
-            fprintf(fp, "Final %d-%s L3 misses %lld\n", count, apps[i%num_apps], values[i][2]);
-            fprintf(fp, "Final %d-%s L3 accesses %lld\n", count, apps[i%num_apps], values[i][3]);
-            fprintf(fp, "Final %d-%s L3 Miss rate %.5f\n", count, apps[i%num_apps], miss_rate);
-            fprintf(fp, "Final %d-%s L3 MPKI %.5f\n", count, apps[i%num_apps], mpki);
-            fprintf(fp, "Final %d-%s IPC %.5f\n", count, apps[i%num_apps], ipc);
-            fprintf(fp, "********************\n\n");
             if(use_csv==1)
             {
                   fprintf(cfp, "CPU%d;%d;%lld;;instructions;%s\n", i,count,values[i][1],apps[i%num_apps]);
@@ -454,16 +467,32 @@ void do_papi(int num_papi_loops, int num_secs, pid_t* pids, int num_procs, char 
                   fprintf(cfp, "CPU%d;%d;%.8f;;miss_rate;%s\n", i,count,miss_rate,apps[i%num_apps]);
                   fprintf(cfp, "CPU%d;%d;%.8f;;MPKI;%s\n", i,count,mpki,apps[i%num_apps]);
             }
+            else
+            {
+                  printf("END %d, PID:%d - %s\n", count, pids[i], apps[i%num_apps]);
+                  printf("Final %d-%s Cycles %lld\n", count, apps[i%num_apps], values[i][0]);
+                  printf("Final %d-%s Instructions %lld\n", count, apps[i%num_apps], values[i][1]);
+                  printf("Final %d-%s L3 misses %lld\n", count, apps[i%num_apps], values[i][2]);
+                  printf("Final %d-%s L3 accesses %lld\n", count, apps[i%num_apps], values[i][3]);
+                  printf("Final %d-%s L3 Miss rate %.5f\n", count, apps[i%num_apps], miss_rate);
+                  printf("Final %d-%s L3 MPKI %.5f\n", count, apps[i%num_apps], mpki);
+                  printf("Final %d-%s IPC %.5f\n", count, apps[i%num_apps], ipc);
+                  printf("********************\n\n");
+            }
+            
       }
-      if(fflush(fp))
-            perror("fflush error\n");
-      if(fclose(fp))
-            perror("fclose error\n");
       if(use_csv==1)
       {
             if(fflush(cfp))
                   perror("fflush csv error\n");
             if(fclose(cfp))
-                  perror("fclose csv error\n"); 
+                  perror("fclose csv error\n");
+            if(num_papi_loops>1)
+            {
+                  if(fflush(pcfp))
+                        perror("fflush periodic csv error\n");
+                  if(fclose(pcfp))
+                        perror("fclose periodic csv error\n");
+            }
       }
 }

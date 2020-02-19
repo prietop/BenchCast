@@ -31,22 +31,18 @@ int main (int argc, char **argv)
     int num_processors=0;
     int num_apps=0;
     int num_loops=1;
-    int num_papi_loops=NUM_EVENT_LOOPS;
-    int num_secs=SLEEP_SECONDS;
+    int num_papi_loops=1;
+    int num_secs=60;
+    char *csv_filename;
 
     int *pid;
     static spec_barrier_t* my_barrier;
 
-    filename = (char *)malloc(MAX_CWD * sizeof(char));
     struct stat st;
-    if (stat(papi_dir, &st) == -1)
-    {
-        mkdir(papi_dir, 0777);
-    }
     csv_filename = (char *)malloc(MAX_CWD * sizeof(char));
 
     get_options(argc, argv, &waiting, &gem5_work_op, &use_papi, app, sub_app, config, 
-                &num_processors, &num_apps, &num_loops, &use_csv, &num_secs);
+                &num_processors, &num_apps, &num_loops, &use_csv, &num_secs, &num_papi_loops, csv_filename);
 
     pid_t child_pid;
     
@@ -271,7 +267,7 @@ int main (int argc, char **argv)
     {
         //call PAPI (defined in .h)
         printf("Starting PAPI measures %d each %ds\n", num_papi_loops, num_secs);
-        do_papi(num_papi_loops, num_secs, pid, num_processors, app, num_apps,use_csv, EventSet);
+        do_papi(num_papi_loops, num_secs, pid, num_processors, app, num_apps,use_csv, EventSet, csv_filename);
         printf("PAPI ENDED\n");
         fflush(stdout);
         fflush(stderr);
