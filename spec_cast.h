@@ -16,9 +16,10 @@ Author: Pablo Prieto Torralbo <prietop@unican.es>
 
 #define MAX_CWD 600
 #define MAX_APP_LENGTH 20
-#define MAX_THREADS 128
-#define SLEEP_SECONDS 60
-#define DEFAULT_PAPI_LOOPS 1
+#define CYCLES 1
+#define INSTRUCTIONS 2
+#define L3MISSES 4
+#define L3ACCESSES 8
 static const char shm_name[] = "tmp_pthread_barrierattr_getpshared";
 
 typedef struct spec_barrier {
@@ -294,7 +295,7 @@ void get_options(int argc, char** argv, int* waiting, int* gem5_work_op, int* us
     }
 }
 
-void init_papi(int num_papi_loops, pid_t* pids, int num_procs, char (*apps)[MAX_APP_LENGTH], int num_apps, int* EventSet)
+void init_papi(int num_papi_loops, pid_t* pids, int num_procs, char (*apps)[MAX_APP_LENGTH], int num_apps, int* EventSet, int* event_mask)
 {
       int retval;
       int i=0, count=0;
@@ -348,14 +349,26 @@ void init_papi(int num_papi_loops, pid_t* pids, int num_procs, char (*apps)[MAX_
                   handle_error(retval);
             }
             
-            if (PAPI_add_event(EventSet[i], PAPI_TOT_CYC) != PAPI_OK)
-                  handle_error(1);
-            if (PAPI_add_event(EventSet[i], PAPI_TOT_INS) != PAPI_OK)
-                  handle_error(1);
-            if (PAPI_add_event(EventSet[i], PAPI_L3_TCM) != PAPI_OK)
-                  handle_error(1);
-            if (PAPI_add_event(EventSet[i], PAPI_L3_TCA) != PAPI_OK)
-                  handle_error(1);
+            retval=PAPI_add_named_event(EventSet[i], "PAPI_TOT_CYC");
+            if (retval != PAPI_OK)
+                  fprintf(stderr, "PAPI_TOT_CYC event not found");
+            else
+                  *event_mask |= CYCLES;
+            retval=PAPI_add_named_event(EventSet[i], "PAPI_TOT_INS");
+            if (retval != PAPI_OK)
+                  fprintf(stderr, "PAPI_TOT_INS event not found");
+            else
+                  *event_mask |= INSTRUCTIONS;
+            retval=PAPI_add_named_event(EventSet[i], "PAPI_L3_TCM");
+            if (retval != PAPI_OK)
+                  fprintf(stderr, "PAPI_L3_TCM event not found");
+            else
+                  *event_mask |= L3MISSES;
+            retval=PAPI_add_named_event(EventSet[i], "PAPI_L3_TCA");
+            if (retval != PAPI_OK)
+                  fprintf(stderr, "PAPI_L3_TCA event not found");
+            else
+                  *event_mask |= L3ACCESSES;
 
             /* Attach this EventSet to the forked process */
             retval=PAPI_attach(EventSet[i], pids[i]);
@@ -369,7 +382,7 @@ void init_papi(int num_papi_loops, pid_t* pids, int num_procs, char (*apps)[MAX_
 }
 
 void do_papi(int num_papi_loops, int num_secs, pid_t* pids, int num_procs, char (*apps)[MAX_APP_LENGTH], int num_apps, 
-            int use_csv, int* EventSet, char* csv_filename)
+            int use_csv, int* EventSet, char* csv_filename, int event_mask)
 {
       int retval;
       long long values[num_procs][4];

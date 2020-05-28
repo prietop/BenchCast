@@ -33,6 +33,7 @@ int main (int argc, char **argv)
     int num_loops=1;
     int num_papi_loops=1;
     int num_secs=60;
+    int event_mask=0;
     char *csv_filename;
 
     int *pid;
@@ -207,7 +208,7 @@ int main (int argc, char **argv)
             rc = pthread_barrier_wait(&my_barrier->barrier);
             if(numWaits == 0 && use_papi == 1)
             {
-                init_papi(num_papi_loops, pid, num_processors, app, num_apps, EventSet);
+                init_papi(num_papi_loops, pid, num_processors, app, num_apps, EventSet, &event_mask);
             }
             numWaits++;
             if(numWaits>=num_loops)
@@ -267,7 +268,7 @@ int main (int argc, char **argv)
     {
         //call PAPI (defined in .h)
         printf("Starting PAPI measures %d each %ds\n", num_papi_loops, num_secs);
-        do_papi(num_papi_loops, num_secs, pid, num_processors, app, num_apps,use_csv, EventSet, csv_filename);
+        do_papi(num_papi_loops, num_secs, pid, num_processors, app, num_apps,use_csv, EventSet, csv_filename, event_mask);
         printf("PAPI ENDED\n");
         fflush(stdout);
         fflush(stderr);
