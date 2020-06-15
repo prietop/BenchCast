@@ -32,7 +32,7 @@ static int print_help;
 
 static void usage(char *argv0) {
 
-  fprintf(stderr, "Usage: %s [-b] [-d] [-w] [-p number] [-n number] [-l number] "
+  fprintf(stderr, "Usage: %s [-b] [-w] [-p number] [-n number] [-l number] "
         "[-c config_name] [-v csv_filename] [-s seconds] [-r number]"
         "--<prog> [number] [--<prog2> [number] --<prog3> ...]\n", argv0);
   fprintf(stderr, "   prog is the program/s you want to cast. Some programs"
