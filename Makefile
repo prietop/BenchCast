@@ -5,7 +5,7 @@ OBJ = spec_cast.o
 ifdef GEM5
 CFLAGS += -DM5OP_ADDR=0xFFFF0000
 SFLAGS += -DM5OP_ADDR=0xFFFF0000
-OBJ += m5_mapMem_c.o m5op_x86_c.o
+OBJ += m5_mmap.o m5op_addr.o
 endif
 # Final run:
 CFLAGS += -O2
