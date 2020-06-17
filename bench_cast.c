@@ -1,8 +1,44 @@
-/*
-Author: Pablo Prieto Torralbo <prietop@unican.es>
-*/
+//
+//   Copyright (C) 2019-2020 by the Computer Engeneering Group, 
+//   the University of Cantabria, Spain.
+//   https://www.ce.unican.es/
+//
+//   This file is part of the BENCHcast performance tool originaly 
+//   developed at the University of Cantabria
+//
+//  --------------------------------------------------------------------
+//
+//  If your use of this software contributes to a published paper, we
+//  request that you cite our summary paper that appears on our
+//  repository (https://github.com/prietop/BENCHcast)
+//  
+//  If you redistribute derivatives of this software, we request that
+//  you notify us.
+//  
+//   --------------------------------------------------------------------
+//
+//   BENCHcast is free software; you can redistribute it and/or
+//   modify it under the terms of version 2 of the GNU General Public
+//   License as published by the Free Software Foundation.
+//
+//   BENCHcast is distributed in the hope that it will be useful,
+//   but WITHOUT ANY WARRANTY; without even the implied warranty of
+//   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+//   General Public License for more details.
+//
+//   You should have received a copy of the GNU General Public License
+//   along with the BENCHcast performance tool; if not, write to the Free Software
+//   Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
+//   02111-1307, USA
+//
+//   The GNU General Public License is contained in the file LICENSE.
+//
+//     
+//*************************************************************************
+//Author: Pablo Prieto Torralbo <prietop@unican.es>
 
-#include "spec_cast.h"
+
+#include "bench_cast.h"
 
 #include <pthread.h>
 #include <sys/mman.h>
@@ -22,7 +58,7 @@ int main (int argc, char **argv)
     // GET OPTIONS
     int waiting = 1, gem5_work_op = 0, use_papi=0, i=0, use_csv=0;
 
-    // options struct defined in spec_cast.h
+    // options struct defined in bench_cast.h
     char app[max_num_processors][MAX_APP_LENGTH];
     int sub_app[max_num_processors];
     char my_app[MAX_APP_LENGTH];
@@ -37,7 +73,7 @@ int main (int argc, char **argv)
     char *csv_filename;
 
     int *pid;
-    static spec_barrier_t* my_barrier;
+    static bench_barrier_t* my_barrier;
 
     struct stat st;
     csv_filename = (char *)malloc(MAX_CWD * sizeof(char));
@@ -113,7 +149,7 @@ int main (int argc, char **argv)
     }
 
     // define size of shared object
-    if(ftruncate(shm_fd, sizeof(spec_barrier_t)) != 0)
+    if(ftruncate(shm_fd, sizeof(bench_barrier_t)) != 0)
     {
         perror("[E] Error at ftruncate()");
         shm_unlink(shm_name);
@@ -121,7 +157,7 @@ int main (int argc, char **argv)
     }
 
     /* Map the shared memory object to my memory */
-    my_barrier = (spec_barrier_t*)mmap(NULL, sizeof(spec_barrier_t), PROT_READ|PROT_WRITE,
+    my_barrier = (bench_barrier_t*)mmap(NULL, sizeof(bench_barrier_t), PROT_READ|PROT_WRITE,
     MAP_SHARED, shm_fd, (off_t)0);
 
     if(my_barrier == MAP_FAILED)
@@ -169,7 +205,7 @@ int main (int argc, char **argv)
         }
         else if(pid[proc] == 0)
         {
-            //child (SPEC app)
+            //child (app)
             bind_pid(proc+init_proc, getpid());
             strcpy(my_app, app[app_index]);
             my_sub_app = sub_app[app_index];
@@ -177,7 +213,7 @@ int main (int argc, char **argv)
         }
         else
         {
-            //parent (spec_cast)
+            //parent (bench_cast)
             printf("parent pid : %d, child pid : %d\n", (int)getpid(), pid[proc]);
         }
         proc++;
@@ -220,7 +256,7 @@ int main (int argc, char **argv)
         fprintf(stderr, "%d executing %s %d\n", getpid(), my_app, my_sub_app);
         char my_cmd[4];
         sprintf(my_cmd, "%d", my_sub_app);
-        char *prog[] = { "./launch_spec.py", "--spec", my_app, "--cmd", my_cmd, "--conf", config, NULL };
+        char *prog[] = { "./launch_bench.py", "--app", my_app, "--cmd", my_cmd, "--conf", config, NULL };
         fprintf(stderr, "Executing: ");
         int i=0;
         while(prog[i]!=NULL)
@@ -229,7 +265,7 @@ int main (int argc, char **argv)
             i++;
         }
         fprintf(stderr, "\n");
-        rc = execv("./launch_spec.py", prog);
+        rc = execv("./launch_bench.py", prog);
         if(rc<0)
         {
             fprintf(stderr,"Error execv\n");

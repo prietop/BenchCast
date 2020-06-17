@@ -22,10 +22,10 @@ Author: Pablo Prieto Torralbo <prietop@unican.es>
 #define L3ACCESSES 8
 static const char shm_name[] = "tmp_pthread_barrierattr_getpshared";
 
-typedef struct spec_barrier {
+typedef struct bench_barrier {
    pthread_barrier_t barrier;
    bool doWait;;
-} spec_barrier_t;
+} bench_barrier_t;
 
 static int max_num_processors;
 static int print_help;
@@ -33,7 +33,7 @@ static int print_help;
 static void usage(char *argv0) {
 
   fprintf(stderr, "Usage: %s [-b] [-w] [-p number] [-n number] [-l number] "
-        "[-c config_name] [-v csv_filename] [-s seconds] [-r number]"
+        "[-t bench_type]" "[-c config_name] [-v csv_filename] [-s seconds] [-r number]"
         "--<prog> [number] [--<prog2> [number] --<prog3> ...]\n", argv0);
   fprintf(stderr, "   prog is the program/s you want to cast. Some programs"
         " require an aditional param to indicate the benchmark number\n");
@@ -54,8 +54,8 @@ static void usage(char *argv0) {
   fprintf(stderr, "   -n Number of different programs to run. It defaults to the"
         " number of progs arguments passed. Should be used as a control\n");
   fprintf(stderr, "   -l Number of times the main loop of the ROI should be"
-        " executed before the creation of the checkpoint (end of spec_cast)\n");
-  fprintf(stderr, "        %s -c spec-cast -d -p 8 -n 2 -l 2 --mcf --bwaves 2\n", argv0);
+        " executed before the creation of the checkpoint (end of bench_cast)\n");
+  fprintf(stderr, "        %s -c bench-cast -d -p 8 -n 2 -l 2 --mcf --bwaves 2\n", argv0);
   fprintf(stderr, "      will run 4 instances of \"mcf \" and 4 instances of"
         " \"bwaves\" (with input bwaves_2) and stop after 2 loops of the ROI\n");
   fprintf(stderr, "\n");

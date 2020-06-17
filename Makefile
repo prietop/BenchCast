@@ -1,7 +1,7 @@
 CC=gcc
 CFLAGS=
 SFLAGS= 
-OBJ = spec_cast.o 
+OBJ = bench_cast.o 
 ifdef GEM5
 CFLAGS += -DM5OP_ADDR=0xFFFF0000
 SFLAGS += -DM5OP_ADDR=0xFFFF0000
@@ -15,9 +15,9 @@ OBJOPT        ?= -c -o $@
 # or, if you want debugging:
 # CFLAGS += -ggdb -fno-inline -O0 -DCAST_DEBUG
 
-all: spec_cast
+all: bench_cast
 clean:
-	rm -f ${OBJ} spec_cast
+	rm -f ${OBJ} bench_cast
 
 # C
 %.o: %.c
@@ -27,5 +27,5 @@ clean:
 %.o: %.S
 	$(CC) $(OBJOPT) $(SFLAGS) $<
 
-spec_cast: ${OBJ}
-	${CC} ${CFLAGS} -o spec_cast ${OBJ} ${LDFLAGS}
+bench_cast: ${OBJ}
+	${CC} ${CFLAGS} -o bench_cast ${OBJ} ${LDFLAGS}
