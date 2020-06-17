@@ -60,10 +60,10 @@ int main (int argc, char **argv)
 
     // options struct defined in bench_cast.h
     char app[max_num_processors][MAX_APP_LENGTH];
-    int sub_app[max_num_processors];
-    char my_app[MAX_APP_LENGTH];
+    char sub_app[max_num_processors][MAX_APP_LENGTH];
+    char my_bench[MAX_APP_LENGTH];
     char config[20] = "gem5";
-    int my_sub_app;
+    char* my_sub_bench;
     int num_processors=0;
     int num_apps=0;
     int num_loops=1;
@@ -207,8 +207,8 @@ int main (int argc, char **argv)
         {
             //child (app)
             bind_pid(proc+init_proc, getpid());
-            strcpy(my_app, app[app_index]);
-            my_sub_app = sub_app[app_index];
+            strcpy(my_bench, app[app_index]);
+            my_sub_bench = sub_app[app_index];
             break;
         }
         else
@@ -253,10 +253,20 @@ int main (int argc, char **argv)
     }
     else
     {
-        fprintf(stderr, "%d executing %s %d\n", getpid(), my_app, my_sub_app);
-        char my_cmd[4];
-        sprintf(my_cmd, "%d", my_sub_app);
-        char *prog[] = { "./launch_bench.py", "--app", my_app, "--cmd", my_cmd, "--conf", config, NULL };
+        fprintf(stderr, "%d executing %s %d\n", getpid(), my_bench, my_sub_bench);
+        char my_cmd[MAX_APP_LENGTH];
+        char my_app[MAX_APP_LENGTH];
+        char* token;
+        token = strtok(my_sub_bench, ".");
+        if (token!=NULL)
+        {
+            strcpy(my_app, token);
+            token=strtok(NULL, ".");
+            if(token != NULL)
+                strcpy(my_cmd, token);
+        }
+
+        char *prog[] = { "./launch_bench.py", "--bench", my_bench, "--app", my_app, "--cmd", my_cmd, "--conf", config, NULL };
         fprintf(stderr, "Executing: ");
         int i=0;
         while(prog[i]!=NULL)

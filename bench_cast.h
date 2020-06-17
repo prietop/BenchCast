@@ -33,12 +33,14 @@ static int print_help;
 static void usage(char *argv0) {
 
   fprintf(stderr, "Usage: %s [-b] [-w] [-p number] [-n number] [-l number] "
-        "[-t bench_type]" "[-c config_name] [-v csv_filename] [-s seconds] [-r number]"
-        "--<prog> [number] [--<prog2> [number] --<prog3> ...]\n", argv0);
-  fprintf(stderr, "   prog is the program/s you want to cast. Some programs"
-        " require an aditional param to indicate the benchmark number\n");
-  fprintf(stderr, "   among all available for that prog (check LAUNCH_CMKS.py"
-        " to see the benchmarks available for each prog)\n");
+        "[-c config_name] [-v csv_filename] [-s seconds] [-r number]"
+        "--<BENCH> [app1.cmd] [--<BENCH2> [app2.cmd] --<BENCH3> [app3.cmd] ...]\n", argv0);
+  fprintf(stderr, "   BENCH.app is the program/s you want to cast. Applications usually"
+        " require an aditional param to indicate the exact command line to execute\n"
+        " # BENCH is the benchmark that application belongs to (SPEC, NPB, PARSEC...)\n"
+        " # app is the current program (is, ft, bwaves, mcf, namd...)\n"
+        " # cmd is the exact version of tha app to execute (is A...)"
+        " Check LAUNCH_CMDS.py for the SPEC 2017 version of the cmd options\n");
   fprintf(stderr, "   -b makes %s to return immediately after launching the "
         "programs. The default is to wait for them to finish.\n", argv0);
   fprintf(stderr, "   -p is the number of processors you want to use from the "
@@ -55,8 +57,8 @@ static void usage(char *argv0) {
         " number of progs arguments passed. Should be used as a control\n");
   fprintf(stderr, "   -l Number of times the main loop of the ROI should be"
         " executed before the creation of the checkpoint (end of bench_cast)\n");
-  fprintf(stderr, "        %s -c bench-cast -d -p 8 -n 2 -l 2 --mcf --bwaves 2\n", argv0);
-  fprintf(stderr, "      will run 4 instances of \"mcf \" and 4 instances of"
+  fprintf(stderr, "        %s -c bench-cast -d -p 8 -n 2 -l 2 --NPB is.A --SPEC bwaves.2\n", argv0);
+  fprintf(stderr, "      will run 4 instances of \"is.A \" and 4 instances of"
         " \"bwaves\" (with input bwaves_2) and stop after 2 loops of the ROI\n");
   fprintf(stderr, "\n");
 
@@ -101,29 +103,9 @@ static void bind_pid (int cpu_num, pid_t PID_NUM)
 static struct option long_options[] =
 {
     /* These options set a flag. */
-    {"perlbench", required_argument, 0, 1},
-    {"gcc",       required_argument, 0, 1},
-    {"bwaves",    required_argument, 0, 1},
-    {"mcf",       no_argument, 0, 0},
-    {"cactuBSSN", no_argument, 0, 0},
-    {"namd",      no_argument, 0, 0},
-    {"parest",    no_argument, 0, 0},
-    {"povray",    no_argument, 0, 0},
-    {"lbm",       no_argument, 0, 0},
-    {"omnetpp",   no_argument, 0, 0},
-    {"wrf",       no_argument, 0, 0},
-    {"xalancbmk", no_argument, 0, 0},
-    {"x264",      required_argument, 0, 1},
-    {"blender",   no_argument, 0, 0},
-    {"cam4",      no_argument, 0, 0},
-    {"deepsjeng", no_argument, 0, 0},
-    {"imagick",   no_argument, 0, 0},
-    {"leela",     no_argument, 0, 0},
-    {"nab",       no_argument, 0, 0},
-    {"exchange2", no_argument, 0, 0},
-    {"fotonik3d", no_argument, 0, 0},
-    {"roms",      no_argument, 0, 0},
-    {"xz",        required_argument, 0, 1},
+    {"SPEC",      required_argument, 0, 1},
+    {"NPB",       required_argument, 0, 1},
+    {"PARSEC",    required_argument, 0, 1},
     {"help",      no_argument, &print_help, 1},
     {0, 0, 0, 0}
 };
@@ -139,7 +121,7 @@ void handle_error (int retval)
 }
 
 void get_options(int argc, char** argv, int* waiting, int* gem5_work_op, int* use_papi, char (*app)[MAX_APP_LENGTH], 
-      int* sub_app, char* config, int* num_processors, int* num_apps, int* num_loops, int* use_csv, int* sleep_sec, 
+      char (*sub_app)[MAX_APP_LENGTH], char* config, int* num_processors, int* num_apps, int* num_loops, int* use_csv, int* sleep_sec, 
       int* num_papi_loops, char* csv_filename)
 {
     int option_index = 0;
@@ -161,7 +143,7 @@ void get_options(int argc, char** argv, int* waiting, int* gem5_work_op, int* us
             if (long_options[option_index].flag != 0)
             break;
             strcpy(app[app_index], long_options[option_index].name);
-            sub_app[app_index]=1;
+            strcpy(sub_app[app_index],"1");
             app_index++;
             break;
 
@@ -169,15 +151,15 @@ void get_options(int argc, char** argv, int* waiting, int* gem5_work_op, int* us
             //long option with required arguments
             printf ("App: %s\n", long_options[option_index].name);
             strcpy(app[app_index], long_options[option_index].name);
-            sub_app[app_index]=atoi(optarg);
-            if(sub_app[app_index]<=0)
+            strcpy(sub_app[app_index],optarg);
+            if(sub_app[app_index]==NULL)
             {
                 fprintf(stderr, "\n*** ERROR *** Application \"%s\"", app[app_index]); 
                 fprintf(stderr, " requires benchmark number \n\n\n");
                 usage(argv[0]);
                 break;
             }
-            printf("Using benchmark %d of %s\n", sub_app[app_index], app[app_index]);
+            printf("Using benchmark %s of %s\n", sub_app[app_index], app[app_index]);
             app_index++;
             break;
 
