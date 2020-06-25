@@ -10,7 +10,7 @@ int initialize_barrier()
       fprintf(stderr,"[E] Error at shm_open()");
       exit(-2);
     }
-    my_barrier = (spec_barrier_t*)mmap(NULL, sizeof(spec_barrier_t), PROT_READ|PROT_WRITE,
+    my_barrier = (bench_barrier_t*)mmap(NULL, sizeof(bench_barrier_t), PROT_READ|PROT_WRITE,
       MAP_SHARED, shm_fd, (off_t)0);
     if(my_barrier == MAP_FAILED)
     {
@@ -30,7 +30,7 @@ int initialize_barrier_()
       fprintf(stderr,"[E] Error at shm_open()");
       exit(-2);
     }
-    my_barrier = (spec_barrier_t*)mmap(NULL, sizeof(spec_barrier_t), PROT_READ|PROT_WRITE,
+    my_barrier = (bench_barrier_t*)mmap(NULL, sizeof(bench_barrier_t), PROT_READ|PROT_WRITE,
       MAP_SHARED, shm_fd, (off_t)0);
     if(my_barrier == MAP_FAILED)
     {

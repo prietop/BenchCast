@@ -5,12 +5,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-typedef struct spec_barrier {
+typedef struct bench_barrier {
    pthread_barrier_t barrier;
    bool doWait;;
-} spec_barrier_t;
+} bench_barrier_t;
 
-static spec_barrier_t* my_barrier;
+static bench_barrier_t* my_barrier;
 
 int initialize_barrier();
 
