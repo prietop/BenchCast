@@ -2,6 +2,16 @@ from SPEC_CMDS import abreviate_spec_name, launch_cmd_rate
 from PARSEC_CMDS import parsec_cmd
 from BENCH_CONF import PATHS
 
+def create_bench(bench, app, conf=""):
+    if bench == "SPEC":
+        return SPEC(app, conf)
+    elif bench == "PARSEC":
+        return PARSEC(app)
+    elif bench == "NPB":
+        return NPB(app)
+    else:
+        return Bench(app)
+
 class Bench:
     def __init__(self, app):
         self.PATH = "."
@@ -13,11 +23,14 @@ class Bench:
 
 class SPEC(Bench):
     def __init__(self, app, conf):
+        print("config %s" % conf)
+        print("app %s" % app)
         self.PATH = PATHS["SPEC"]
         self.config = conf
-        self.app = abreviate_spec_name[app]
+        self.app = app
+        print("app %s" % self.app)
     def getExecPath(self):
-        return "%s/benchspec/CPU/%s/run/run_base_refrate_%s-m64.0000/" % (self.PATH, self.app, self.config)
+        return "%s/benchspec/CPU/%s/run/run_base_refrate_%s-m64.0000/" % (self.PATH, abreviate_spec_name[self.app], self.config)
     def getNameApp(self, app_name):
         if ("gcc" in app_name):
             return "cpu"+app_name
@@ -28,7 +41,7 @@ class SPEC(Bench):
         else:
             return app_name
     def getExecCmd(self, cmd):
-        return "./%s_base.%s-m64 %s" % (self.getNameApp(self.app), self.config, launch_cmd_rate[self.app][int(cmd)])
+        return "./%s_r_base.%s-m64 %s" % (self.getNameApp(self.app), self.config, launch_cmd_rate[abreviate_spec_name[self.app]][int(cmd)])
 
 class NPB(Bench):
     def __init__(self, app):
@@ -44,7 +57,10 @@ class PARSEC(Bench):
         Bench.__init__(self, app)
         self.PATH = PATHS["PARSEC"]
     def getExecPath(self):
-        return "%s/pkgs/apps/%s/inst/amd64-linux.gcc/bin" % (self.PATH, self.app)
+        if self.app == "canneal" or self.app == "dedup" or self.app == "streamcluster":
+            return "%s/pkgs/kernels/%s/inst/amd64-linux.gcc-serial/bin" % (self.PATH, self.app)
+        else:
+            return "%s/pkgs/apps/%s/inst/amd64-linux.gcc-serial/bin" % (self.PATH, self.app)
     def getNameApp(self, app_name):
         if ("raytrace" in app_name):
             return "rtview"

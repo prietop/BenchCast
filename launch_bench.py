@@ -73,14 +73,15 @@ if args.cmd is None:
     printColor("ERRPR --cmd needed and not included", "red")
     parser.print_help(sys.stderr)
     exit()
-if (args.bench == "SPEC"):
-    app = SPEC(args.app, args.conf)
-elif (args.bench == "NPB"):
-    app = NPB(args.app)
-else:
-    printColor("Benchmark type %s not included" % args.bench, "red")
-    parser.print_help(sys.stderr)
-    exit()
+app = create_bench(bench=args.bench, app=args.app, conf=args.conf)
+
+if (args.bench == "PARSEC"):
+    print("changing LD_LIBRARY_PATH... TODO")
+    ld_path = os.path.join(os.getcwd(), app.PATH+'/pkgs/libs/hooks/inst/amd64-linux.gcc-serial/lib')
+    if os.environ.get('LD_LIBRARY_PATH') is not None:
+        os.environ['LD_LIBRARY_PATH'] += ':'+os.path.normpath(ld_path)
+    else:
+        os.environ['LD_LIBRARY_PATH'] = ':'+os.path.normpath(ld_path)
 
 exec_dir=app.getExecPath()
 print(exec_dir)
