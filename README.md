@@ -2,7 +2,8 @@
 SPECcast is a performance evaluation tool that uses profiling ([PAPI](https://icl.utk.edu/papi/)) and synchronization mechanisms to overcome limitations of current alternatives. SPECcast is able to generate huge amount of multiprogrammed workloads from SPEC, executing their Region Of Interest (ROI) simultaneously. Therefore it can provide high number of measures in a short amount of time, and thanks to PAPI, it is not limited to execution time or IPC. SPECcast is intended to be used on real hardware and/or Full System simulations tools (like [gem5](https://www.gem5.org/)). 
 
 ## Announcements
-* SPECcast is presented at [ICPP'20](https://doi.org/10.1145/340397.3404424)
+* SPECcast paper at ICPP'20 [Paper](https://doi.org/10.1145/3404397.3404424)
+* SPECcast video presentation [Video](https://www.youtube.com/watch?v=h5hMzUvMAWY)
   
 
 ## SPEC CPU 2017 Integration
