@@ -184,13 +184,13 @@ int main (int argc, char **argv)
     }
 
     int init_proc=0;
-    if(num_processors < max_num_processors)
-    {
+    //if(num_processors < max_num_processors)
+    //{
         /* There will be at least one processor iddle and we will use it to
         execute the OS */
-        printf("Devoting core 0 to OS\n");
-        init_proc=1;
-    }
+    //    printf("Devoting core 0 to OS\n");
+    //    init_proc=1;
+    //}
 
     /* Fork a child process */
     proc=0;
