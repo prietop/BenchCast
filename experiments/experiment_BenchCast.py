@@ -129,8 +129,8 @@ parser.add_argument('--userdt', action='store_true',
                     help='Use resource director')
 parser.add_argument('--max_apps', type=int, default=8,
                     help='Maximum number of apps in a mix')
-parser.add_argument('--num_procs', type=int, help='Number of processors')
-
+parser.add_argument('--num_procs', type=int, 
+                    help='Number of processors')
 
 args = parser.parse_args()
 
@@ -141,6 +141,9 @@ spec_cast_seconds=args.seconds
 max_apps = args.max_apps
 
 num_cpus = multiprocessing.cpu_count()
+if args.num_procs:
+    num_cpus=args.num_procs
+
 seed(os.getpid())
 
 original_dir=os.getcwd()
@@ -189,6 +192,7 @@ else:
 best_metric='AvgSpeedUp'
 best_distrib='norm'
 best_test=0.0
+count=0
 
 while best_test < alpha or count < args.mintests:
     for i in range(batch_size):
