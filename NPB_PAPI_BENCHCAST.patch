@@ -1,0 +1,1009 @@
+diff --git a/NPB3.3-SER/BT/Makefile b/NPB3.3-SER/BT/Makefile
+index 24f6fea..1b1a8cb 100644
+--- a/NPB3.3-SER/BT/Makefile
++++ b/NPB3.3-SER/BT/Makefile
+@@ -10,7 +10,8 @@ OBJS = bt.o  initialize.o exact_solution.o exact_rhs.o \
+        set_constants.o adi.o  rhs.o      \
+        x_solve$(VEC).o y_solve$(VEC).o solve_subs.o  \
+        z_solve$(VEC).o add.o error.o verify.o \
+-       ${COMMON}/print_results.o ${COMMON}/timers.o ${COMMON}/wtime.o
++       ${COMMON}/print_results.o ${COMMON}/timers.o ${COMMON}/wtime.o \
++       ${COMMON}/barrier_cast.o ${COMMON}/papi_cast.o
+ 
+ include ../sys/make.common
+ 
+@@ -37,7 +38,7 @@ exec: $(OBJS)
+ 	${FLINK} ${FLINKFLAGS} -o ${PROGRAM} ${OBJS} ${F_LIB}
+ 
+ .f.o:
+-	${FCOMPILE} $<
++	${FCOMPILE} $(CKPT) $<
+ 
+ 
+ bt.o:             bt.f  header.h npbparams.h
+diff --git a/NPB3.3-SER/BT/bt.f b/NPB3.3-SER/BT/bt.f
+index f9629ae..61c96c5 100644
+--- a/NPB3.3-SER/BT/bt.f
++++ b/NPB3.3-SER/BT/bt.f
+@@ -141,9 +141,17 @@ c---------------------------------------------------------------------
+           call timer_clear(i)
+        end do
+        call timer_start(1)
+-
++#ifdef BENCHCAST
++       call initialize_barrier()
++#endif
+        do  step = 1, niter
+-
++c ROI begin
++#ifdef BENCHCAST
++       call call_barrier()
++#endif
++#ifdef USE_PAPI
++       call papi_start()
++#endif
+           if (mod(step, 20) .eq. 0 .or. 
+      >        step .eq. 1) then
+              write(*, 200) step
+@@ -151,7 +159,10 @@ c---------------------------------------------------------------------
+           endif
+ 
+           call adi
+-
++c ROI end
++#ifdef USE_PAPI
++       call papi_stop()
++#endif
+        end do
+ 
+        call timer_stop(1)
+diff --git a/NPB3.3-SER/CG/Makefile b/NPB3.3-SER/CG/Makefile
+index 61c9ac8..6225649 100644
+--- a/NPB3.3-SER/CG/Makefile
++++ b/NPB3.3-SER/CG/Makefile
+@@ -5,7 +5,8 @@ BENCHMARKU=CG
+ include ../config/make.def
+ 
+ OBJS = cg.o ${COMMON}/print_results.o  \
+-       ${COMMON}/${RAND}.o ${COMMON}/timers.o ${COMMON}/wtime.o
++       ${COMMON}/${RAND}.o ${COMMON}/timers.o ${COMMON}/wtime.o\
++       ${COMMON}/barrier_cast.o ${COMMON}/papi_cast.o
+ 
+ include ../sys/make.common
+ 
+@@ -13,7 +14,7 @@ ${PROGRAM}: config ${OBJS}
+ 	${FLINK} ${FLINKFLAGS} -o ${PROGRAM} ${OBJS} ${F_LIB}
+ 
+ cg.o:		cg.f  globals.h npbparams.h
+-	${FCOMPILE} cg.f
++	${FCOMPILE} $(CKPT) cg.f
+ 
+ clean:
+ 	- rm -f *.o *~ 
+diff --git a/NPB3.3-SER/CG/cg.f b/NPB3.3-SER/CG/cg.f
+index 556b92b..ac41779 100644
+--- a/NPB3.3-SER/CG/cg.f
++++ b/NPB3.3-SER/CG/cg.f
+@@ -290,7 +290,9 @@ c
+  2000 format(' Initialization time = ',f15.3,' seconds')
+ 
+       call timer_start( T_bench )
+-
++#ifdef BENCHCAST
++       call initialize_barrier()
++#endif
+ c---------------------------------------------------------------------
+ c---->
+ c  Main Iteration for inverse power method
+@@ -302,6 +304,13 @@ c---------------------------------------------------------------------
+ c  The call to the conjugate gradient routine:
+ c---------------------------------------------------------------------
+          if ( timeron ) call timer_start( T_conj_grad )
++c ROI begin
++#ifdef BENCHCAST
++         call call_barrier()
++#endif
++#ifdef USE_PAPI
++       call papi_start()
++#endif
+          call conj_grad ( colidx,
+      >                    rowstr,
+      >                    x,
+@@ -311,6 +320,7 @@ c---------------------------------------------------------------------
+      >                    q,
+      >                    r,
+      >                    rnorm )
++c ROI end (m5 - not complete loop)
+          if ( timeron ) call timer_stop( T_conj_grad )
+ 
+ 
+@@ -345,7 +355,10 @@ c---------------------------------------------------------------------
+             x(j) = norm_temp2*z(j)    
+          enddo                           
+ 
+-
++c ROI end (complete loop)
++#ifdef USE_PAPI
++       call papi_stop()
++#endif
+       enddo                              ! end of main iter inv pow meth
+ 
+       call timer_stop( T_bench )
+diff --git a/NPB3.3-SER/DC/Makefile b/NPB3.3-SER/DC/Makefile
+index 2db7a8c..58a3f0f 100644
+--- a/NPB3.3-SER/DC/Makefile
++++ b/NPB3.3-SER/DC/Makefile
+@@ -8,7 +8,9 @@ include ../sys/make.common
+ 
+ OBJS = adc.o dc.o extbuild.o rbt.o jobcntl.o \
+ 	${COMMON}/c_print_results.o  \
+-	${COMMON}/c_timers.o ${COMMON}/c_wtime.o
++	${COMMON}/c_timers.o ${COMMON}/c_wtime.o\
++    ${COMMON}/barrier_cast.o ${COMMON}/papi_cast.o
++
+ 
+ 
+ # npbparams.h is provided for backward compatibility with NPB compilation
+@@ -18,7 +20,7 @@ ${PROGRAM}: config ${OBJS}
+ 	${CLINK} ${CLINKFLAGS} -o ${PROGRAM} ${OBJS} ${C_LIB}
+ 
+ .c.o:
+-	$(CCOMPILE) $<
++	$(CCOMPILE) $(CKPT) $<
+ 
+ adc.o:      adc.c npbparams.h
+ dc.o:       dc.c adcc.h adc.h macrodef.h npbparams.h
+diff --git a/NPB3.3-SER/DC/extbuild.c b/NPB3.3-SER/DC/extbuild.c
+index 3550537..7e29fe4 100644
+--- a/NPB3.3-SER/DC/extbuild.c
++++ b/NPB3.3-SER/DC/extbuild.c
+@@ -6,6 +6,14 @@
+ #include "macrodef.h"
+ #include "protots.h"
+ 
++#ifdef BENCHCAST
++#include "../common/barrier_cast.h"
++#endif
++
++#ifdef USE_PAPI
++#include "../common/papi_cast.h"
++#endif
++
+ #ifdef UNIX
+ #include <errno.h>
+ #endif
+@@ -869,8 +877,17 @@ int32 ComputeGivenGroupbys(ADC_VIEW_CNTL *adccntlp){
+ #endif
+    uint32 selection_viewsize[2];
+    char ttout[16];
+-
++#ifdef BENCHCAST
++	initialize_barrier();
++#endif
+    while (fread(&binRepTuple, 8, 1, adccntlp->groupbyFile )){
++     // ROI begin
++#ifdef BENCHCAST
++			call_barrier();
++#endif
++#ifdef USE_PAPI
++        papi_start();
++#endif
+      for(i = 0; i < adccntlp->nm; i++) adccntlp->checksums[i]=0;
+      nViews++;
+      swap8(&binRepTuple);
+@@ -981,6 +998,10 @@ int32 ComputeGivenGroupbys(ADC_VIEW_CNTL *adccntlp){
+         fprintf(adccntlp->logf, " %20lld", adccntlp->checksums[i]);
+      }
+      fprintf(adccntlp->logf, " | %5d", adccntlp->numberOfChunks);
++   // ROI end
++#ifdef USE_PAPI
++     papi_stop();
++#endif
+    }
+    adccntlp->numberOfMadeViews = nViews;  
+    if(ViewSizesVerification(adccntlp)) return ADC_VERIFICATION_FAILED;
+diff --git a/NPB3.3-SER/EP/Makefile b/NPB3.3-SER/EP/Makefile
+index e763d62..2d75839 100644
+--- a/NPB3.3-SER/EP/Makefile
++++ b/NPB3.3-SER/EP/Makefile
+@@ -5,7 +5,8 @@ BENCHMARKU=EP
+ include ../config/make.def
+ 
+ OBJS = ep.o ${COMMON}/print_results.o ${COMMON}/${RAND}.o \
+-       ${COMMON}/timers.o ${COMMON}/wtime.o
++       ${COMMON}/timers.o ${COMMON}/wtime.o\
++       ${COMMON}/barrier_cast.o ${COMMON}/papi_cast.o
+ 
+ include ../sys/make.common
+ 
+@@ -14,7 +15,7 @@ ${PROGRAM}: config ${OBJS}
+ 
+ 
+ ep.o:		ep.f npbparams.h
+-	${FCOMPILE} ep.f
++	${FCOMPILE} $(CKPT) ep.f
+ 
+ clean:
+ 	- rm -f *.o *~ 
+diff --git a/NPB3.3-SER/EP/ep.f b/NPB3.3-SER/EP/ep.f
+index a8f0d74..8926518 100644
+--- a/NPB3.3-SER/EP/ep.f
++++ b/NPB3.3-SER/EP/ep.f
+@@ -158,6 +158,7 @@ c   have more numbers to generate than others
+       k_offset = -1
+ 
+       do 150 k = 1, np
++c ROI begin (First loop there are multiple timers...)
+          kk = k_offset + k 
+          t1 = s
+          t2 = an
+@@ -184,8 +185,17 @@ c        tally counts in concentric square annuli.  This loop is not
+ c        vectorizable. 
+ 
+          if (timers_enabled) call timer_start(2)
+-
++#ifdef BENCHCAST
++       call initialize_barrier()
++#endif
+          do 140 i = 1, nk
++c ROI begin (Second there are multiple timers)
++#ifdef BENCHCAST
++         call call_barrier()
++#endif
++#ifdef USE_PAPI
++       call papi_start()
++#endif
+             x1 = 2.d0 * x(2*i-1) - 1.d0
+             x2 = 2.d0 * x(2*i) - 1.d0
+             t1 = x1 ** 2 + x2 ** 2
+@@ -198,10 +208,14 @@ c        vectorizable.
+                sx   = sx + t3
+                sy   = sy + t4
+             endif
++c ROI end (Second)
++#ifdef USE_PAPI
++       call papi_stop()
++#endif
+  140     continue
+ 
+          if (timers_enabled) call timer_stop(2)
+-
++c ROI end (First)
+  150  continue
+ 
+ 
+diff --git a/NPB3.3-SER/FT/Makefile b/NPB3.3-SER/FT/Makefile
+index 116d55d..0b64183 100644
+--- a/NPB3.3-SER/FT/Makefile
++++ b/NPB3.3-SER/FT/Makefile
+@@ -8,7 +8,8 @@ include ../sys/make.common
+ 
+ OBJS = appft.o auxfnct.o fft3d.o mainft.o verify.o \
+        ${COMMON}/${RAND}.o ${COMMON}/print_results.o \
+-       ${COMMON}/timers.o ${COMMON}/wtime.o
++       ${COMMON}/timers.o ${COMMON}/wtime.o\
++       ${COMMON}/barrier_cast.o ${COMMON}/papi_cast.o
+ 
+ ${PROGRAM}: config ${OBJS}
+ 	${FLINK} ${FLINKFLAGS} -o ${PROGRAM} ${OBJS} ${F_LIB}
+@@ -16,7 +17,7 @@ ${PROGRAM}: config ${OBJS}
+ 
+ 
+ .f.o:
+-	${FCOMPILE} $<
++	${FCOMPILE} $(CKPT) $<
+ 
+ appft.o:	appft.f  global.h npbparams.h
+ auxfnct.o:	auxfnct.f  global.h npbparams.h
+diff --git a/NPB3.3-SER/FT/appft.f b/NPB3.3-SER/FT/appft.f
+index cdde43b..0a192a3 100644
+--- a/NPB3.3-SER/FT/appft.f
++++ b/NPB3.3-SER/FT/appft.f
+@@ -57,8 +57,17 @@
+          if (timers_enabled) call timer_start(15)      
+          call fftXYZ(1,xnt,y,exp1,exp2,exp3,nx,ny,nz)
+          if (timers_enabled) call timer_stop(15)      
+-
++#ifdef BENCHCAST
++         call initialize_barrier()
++#endif
+          do kt = 1, niter
++! ROI begin (I guess ... 15 timers)
++#ifdef BENCHCAST
++           call call_barrier()
++#endif
++#ifdef USE_PAPI
++       call papi_start()
++#endif
+            if (timers_enabled) call timer_start(11)      
+            call evolve(xnt,y,twiddle,nx,ny,nz)
+            if (timers_enabled) call timer_stop(11)      
+@@ -67,7 +76,11 @@
+            if (timers_enabled) call timer_stop(15)      
+            if (timers_enabled) call timer_start(10)      
+            call CalculateChecksum(sums(kt),kt,xnt,nx,ny,nz)           
+-           if (timers_enabled) call timer_stop(10)      
++           if (timers_enabled) call timer_stop(10)  
++! ROI end (I guess)
++#ifdef USE_PAPI
++       call papi_stop()
++#endif
+          end do
+ !
+ ! Verification test.
+diff --git a/NPB3.3-SER/IS/Makefile b/NPB3.3-SER/IS/Makefile
+index 30e474d..cc57069 100644
+--- a/NPB3.3-SER/IS/Makefile
++++ b/NPB3.3-SER/IS/Makefile
+@@ -9,14 +9,16 @@ include ../sys/make.common
+ OBJS = is.o \
+        ${COMMON}/c_print_results.o \
+        ${COMMON}/c_timers.o \
+-       ${COMMON}/c_wtime.o
++       ${COMMON}/c_wtime.o \
++	   ${COMMON}/barrier_cast.o \
++	   ${COMMON}/papi_cast.o
+ 
+ 
+ ${PROGRAM}: config ${OBJS}
+ 	${CLINK} ${CLINKFLAGS} -o ${PROGRAM} ${OBJS} ${C_LIB}
+ 
+ .c.o:
+-	${CCOMPILE} $<
++	${CCOMPILE} $(CKPT) $<
+ 
+ is.o:             is.c  npbparams.h
+ 
+diff --git a/NPB3.3-SER/IS/is.c b/NPB3.3-SER/IS/is.c
+index a89dccd..ad4f1ba 100644
+--- a/NPB3.3-SER/IS/is.c
++++ b/NPB3.3-SER/IS/is.c
+@@ -43,7 +43,12 @@
+ #include "npbparams.h"
+ #include <stdlib.h>
+ #include <stdio.h>
+-
++#ifdef BENCHCAST
++#include "../common/barrier_cast.h"
++#endif
++#ifdef USE_PAPI
++#include "../common/papi_cast.h"
++#endif
+ 
+ /*****************************************************************/
+ /* For serial IS, buckets are not really req'd to solve NPB1 IS  */
+@@ -727,12 +732,27 @@ int main( int argc, char **argv )
+ /*  Start timer  */             
+     timer_start( 0 );
+ 
+-
++#ifdef BENCHCAST
++	initialize_barrier();
++#endif
+ /*  This is the main iteration */
+     for( iteration=1; iteration<=MAX_ITERATIONS; iteration++ )
+     {
++    // ROI begin
++#ifdef BENCHCAST
++			printf("IS %d iteration %d of %d calling barrier\n", getpid(), iteration, MAX_ITERATIONS);
++			call_barrier();
++			printf("IS %d getting along with the barrier\n", getpid());
++#endif
++#ifdef USE_PAPI
++        papi_start();
++#endif
+         if( CLASS != 'S' ) printf( "        %d\n", iteration );
+         rank( iteration );
++#ifdef USE_PAPI
++        papi_stop();
++#endif
++    // ROI end
+     }
+ 
+ 
+diff --git a/NPB3.3-SER/LU/Makefile b/NPB3.3-SER/LU/Makefile
+index 5fa7a3c..0c103a3 100644
+--- a/NPB3.3-SER/LU/Makefile
++++ b/NPB3.3-SER/LU/Makefile
+@@ -10,7 +10,8 @@ OBJS = lu.o read_input.o \
+        erhs.o ssor$(VEC).o rhs$(VEC).o l2norm.o \
+        jacld.o blts$(VEC).o jacu.o buts$(VEC).o error.o \
+        pintgr.o verify.o ${COMMON}/print_results.o \
+-       ${COMMON}/timers.o ${COMMON}/wtime.o
++       ${COMMON}/timers.o ${COMMON}/wtime.o\
++       ${COMMON}/barrier_cast.o ${COMMON}/papi_cast.o
+ 
+ include ../sys/make.common
+ 
+@@ -38,7 +39,7 @@ exec: $(OBJS)
+ 	${FLINK} ${FLINKFLAGS} -o ${PROGRAM} ${OBJS} ${F_LIB}
+ 
+ .f.o :
+-	${FCOMPILE} $<
++	${FCOMPILE} $(CKPT) $<
+ 
+ lu.o:		lu.f applu.incl npbparams.h
+ blts$(VEC).o:	blts$(VEC).f
+diff --git a/NPB3.3-SER/LU/ssor.f b/NPB3.3-SER/LU/ssor.f
+index ce1e344..9000448 100644
+--- a/NPB3.3-SER/LU/ssor.f
++++ b/NPB3.3-SER/LU/ssor.f
+@@ -79,13 +79,21 @@ c      end if
+          call timer_clear(i)
+       end do
+       call timer_start(1)
+- 
++#ifdef BENCHCAST
++       call initialize_barrier()
++#endif
+ c---------------------------------------------------------------------
+ c   the timestep loop
+ c---------------------------------------------------------------------
+       do istep = 1, niter
+ 
+-         
++c ROI begin
++#ifdef BENCHCAST
++         call call_barrier()
++#endif
++#ifdef USE_PAPI
++       call papi_start()
++#endif
+ c         if ( ( mod ( istep, inorm ) .eq. 0 ) .and.
+ c     >          ipr .eq. 1 ) then
+ c             write ( *, 1001 ) istep
+@@ -222,7 +230,10 @@ c            if (ipr .eq. 1 ) then
+ c            end if
+             go to 900
+          end if
+- 
++c ROI end
++#ifdef USE_PAPI
++       call papi_stop()
++#endif
+       end do
+   900 continue
+  
+diff --git a/NPB3.3-SER/MG/Makefile b/NPB3.3-SER/MG/Makefile
+index 6a3013f..fa75de9 100644
+--- a/NPB3.3-SER/MG/Makefile
++++ b/NPB3.3-SER/MG/Makefile
+@@ -5,7 +5,8 @@ BENCHMARKU=MG
+ include ../config/make.def
+ 
+ OBJS = mg.o ${COMMON}/print_results.o  \
+-       ${COMMON}/${RAND}.o ${COMMON}/timers.o ${COMMON}/wtime.o
++       ${COMMON}/${RAND}.o ${COMMON}/timers.o ${COMMON}/wtime.o\
++       ${COMMON}/barrier_cast.o ${COMMON}/papi_cast.o
+ 
+ include ../sys/make.common
+ 
+@@ -13,7 +14,7 @@ ${PROGRAM}: config ${OBJS}
+ 	${FLINK} ${FLINKFLAGS} -o ${PROGRAM} ${OBJS} ${F_LIB}
+ 
+ mg.o:		mg.f globals.h npbparams.h
+-	${FCOMPILE} mg.f
++	${FCOMPILE} $(CKPT) mg.f
+ 
+ clean:
+ 	- rm -f *.o *~ 
+diff --git a/NPB3.3-SER/MG/mg.f b/NPB3.3-SER/MG/mg.f
+index 61859c2..4683825 100644
+--- a/NPB3.3-SER/MG/mg.f
++++ b/NPB3.3-SER/MG/mg.f
+@@ -244,8 +244,17 @@ c---------------------------------------------------------------------
+       call norm2u3(r,n1,n2,n3,rnm2,rnmu,nx(lt),ny(lt),nz(lt))
+       old2 = rnm2
+       oldu = rnmu
+-
++#ifdef BENCHCAST
++       call initialize_barrier()
++#endif
+       do  it=1,nit
++c ROI begin
++#ifdef BENCHCAST
++         call call_barrier()
++#endif
++#ifdef USE_PAPI
++       call papi_start()
++#endif
+          if (it.eq.1 .or. it.eq.nit .or. mod(it,5).eq.0) then
+             write(*,80) it
+    80       format('  iter ',i3)
+@@ -255,6 +264,10 @@ c---------------------------------------------------------------------
+          if (timeron) call timer_stop(T_mg3P)
+          if (timeron) call timer_start(T_resid2)
+          call resid(u,v,r,n1,n2,n3,a,k)
++c ROI end
++#ifdef USE_PAPI
++       call papi_stop()
++#endif
+          if (timeron) call timer_stop(T_resid2)
+       enddo
+ 
+diff --git a/NPB3.3-SER/SP/Makefile b/NPB3.3-SER/SP/Makefile
+index 9ecbf08..3f0e2b7 100644
+--- a/NPB3.3-SER/SP/Makefile
++++ b/NPB3.3-SER/SP/Makefile
+@@ -9,7 +9,8 @@ OBJS = sp.o initialize.o exact_solution.o exact_rhs.o \
+        set_constants.o adi.o rhs.o      \
+        x_solve.o ninvr.o y_solve.o pinvr.o    \
+        z_solve.o tzetar.o add.o txinvr.o error.o verify.o  \
+-       ${COMMON}/print_results.o ${COMMON}/timers.o ${COMMON}/wtime.o
++       ${COMMON}/print_results.o ${COMMON}/timers.o ${COMMON}/wtime.o\
++       ${COMMON}/barrier_cast.o ${COMMON}/papi_cast.o
+ 
+ include ../sys/make.common
+ 
+@@ -27,7 +28,7 @@ ${PROGRAM}: config ${OBJS}
+ 	${FLINK} ${FLINKFLAGS} -o ${PROGRAM} ${OBJS} ${F_LIB}
+ 
+ .f.o:
+-	${FCOMPILE} $<
++	${FCOMPILE} $(CKPT) $<
+ 
+ sp.o:             sp.f  header.h npbparams.h
+ initialize.o:     initialize.f  header.h npbparams.h
+diff --git a/NPB3.3-SER/SP/sp.f b/NPB3.3-SER/SP/sp.f
+index 6dd0591..c77a3a7 100644
+--- a/NPB3.3-SER/SP/sp.f
++++ b/NPB3.3-SER/SP/sp.f
+@@ -144,16 +144,27 @@ c---------------------------------------------------------------------
+           call timer_clear(i)
+        end do
+        call timer_start(1)
+-
++#ifdef BENCHCAST
++       call initialize_barrier()
++#endif
+        do  step = 1, niter
+-
++c ROI begin
++#ifdef BENCHCAST
++         call call_barrier()
++#endif
++#ifdef USE_PAPI
++       call papi_start()
++#endif
+           if (mod(step, 20) .eq. 0 .or. step .eq. 1) then
+              write(*, 200) step
+  200         format(' Time step ', i4)
+           endif
+ 
+           call adi
+-
++c ROI end
++#ifdef USE_PAPI
++       call papi_stop()
++#endif
+        end do
+ 
+        call timer_stop(1)
+diff --git a/NPB3.3-SER/UA/Makefile b/NPB3.3-SER/UA/Makefile
+index 54d4096..1b867ea 100644
+--- a/NPB3.3-SER/UA/Makefile
++++ b/NPB3.3-SER/UA/Makefile
+@@ -7,7 +7,9 @@ include ../config/make.def
+ 
+ OBJS = ua.o convect.o diffuse.o adapt.o move.o mason.o \
+        precond.o utils.o transfer.o verify.o  setup.o\
+-       ${COMMON}/print_results.o ${COMMON}/timers.o ${COMMON}/wtime.o
++       ${COMMON}/print_results.o ${COMMON}/timers.o ${COMMON}/wtime.o\
++       ${COMMON}/barrier_cast.o ${COMMON}/papi_cast.o
++
+ 
+ include ../sys/make.common
+ 
+@@ -25,7 +27,7 @@ ${PROGRAM}: config ${OBJS}
+ 	${FLINK} ${FLINKFLAGS} -o ${PROGRAM} ${OBJS} ${F_LIB}
+ 
+ .f.o:
+-	${FCOMPILE} $<
++	${FCOMPILE} $(CKPT) $<
+ 
+ ua.o:        ua.f       header.h npbparams.h
+ setup.o:     setup.f    header.h npbparams.h
+diff --git a/NPB3.3-SER/UA/ua.f b/NPB3.3-SER/UA/ua.f
+index 5d45c16..ae2d105 100644
+--- a/NPB3.3-SER/UA/ua.f
++++ b/NPB3.3-SER/UA/ua.f
+@@ -146,6 +146,9 @@ c.....refine initial mesh and do some preliminary work
+       call timer_clear(1)
+ 
+       time = 0.d0
++#ifdef BENCHCAST
++       call initialize_barrier()
++#endif
+       do step= 0, niter
+ 
+         if (step .eq. 1) then
+@@ -158,7 +161,13 @@ c.........reset the solution and start the timer, keep track of total no elms
+           end do
+           call timer_start(1)          
+         endif
+-
++c ROI begin
++#ifdef BENCHCAST
++         call call_barrier()
++#endif
++#ifdef USE_PAPI
++       call papi_start()
++#endif
+ c.......advance the convection step 
+         call convect(ifmortar)
+ 
+@@ -217,6 +226,10 @@ c.......perform mesh adaptation
+           ifmortar = .false.
+         end if
+         nelt_tot = nelt_tot + dble(nelt)
++c ROI end
++#ifdef USE_PAPI
++       call papi_stop()
++#endif
+       end do
+ 
+       call timer_stop(1)
+diff --git a/NPB3.3-SER/common/barrier_cast.c b/NPB3.3-SER/common/barrier_cast.c
+new file mode 100644
+index 0000000..984957c
+--- /dev/null
++++ b/NPB3.3-SER/common/barrier_cast.c
+@@ -0,0 +1,53 @@
++#include "barrier_cast.h"
++
++int initialize_barrier()
++{
++    char    shm_name[] = "tmp_pthread_barrierattr_getpshared";
++    int     shm_fd;
++    shm_fd = shm_open(shm_name, O_RDWR, 0644);
++    if(shm_fd == -1)
++    {
++      fprintf(stderr,"[E] Error at shm_open()");
++      exit(-2);
++    }
++    my_barrier = (bench_barrier_t*)mmap(NULL, sizeof(bench_barrier_t), PROT_READ|PROT_WRITE,
++      MAP_SHARED, shm_fd, (off_t)0);
++    if(my_barrier == MAP_FAILED)
++    {
++      fprintf(stderr,"[E] child: Error at first mmap()");
++      exit(-1);
++    }
++    return 0;
++}
++
++int initialize_barrier_()
++{
++    char    shm_name[] = "tmp_pthread_barrierattr_getpshared";
++    int     shm_fd;
++    shm_fd = shm_open(shm_name, O_RDWR, 0644);
++    if(shm_fd == -1)
++    {
++      fprintf(stderr,"[E] Error at shm_open()");
++      exit(-2);
++    }
++    my_barrier = (bench_barrier_t*)mmap(NULL, sizeof(bench_barrier_t), PROT_READ|PROT_WRITE,
++      MAP_SHARED, shm_fd, (off_t)0);
++    if(my_barrier == MAP_FAILED)
++    {
++      fprintf(stderr,"[E] child: Error at first mmap()");
++      exit(-1);
++    }
++    return 0;
++}
++
++void call_barrier()
++{
++  if(my_barrier->doWait)
++  {  pthread_barrier_wait(&my_barrier->barrier);}
++}
++
++void call_barrier_()
++{
++  if(my_barrier->doWait)
++  {  pthread_barrier_wait(&my_barrier->barrier);}
++}
+\ No newline at end of file
+diff --git a/NPB3.3-SER/common/barrier_cast.h b/NPB3.3-SER/common/barrier_cast.h
+new file mode 100644
+index 0000000..1485c98
+--- /dev/null
++++ b/NPB3.3-SER/common/barrier_cast.h
+@@ -0,0 +1,21 @@
++#include <pthread.h>
++#include <sys/mman.h>
++#include <stdbool.h>
++#include <fcntl.h>
++#include <stdio.h>
++#include <stdlib.h>
++
++typedef struct bench_barrier {
++   pthread_barrier_t barrier;
++   bool doWait;;
++} bench_barrier_t;
++
++static bench_barrier_t* my_barrier;
++
++int initialize_barrier();
++
++int initialize_barrier_();
++
++void call_barrier();
++
++void call_barrier_();
+\ No newline at end of file
+diff --git a/NPB3.3-SER/common/papi_cast.c b/NPB3.3-SER/common/papi_cast.c
+new file mode 100644
+index 0000000..cf31924
+--- /dev/null
++++ b/NPB3.3-SER/common/papi_cast.c
+@@ -0,0 +1,31 @@
++#include "papi_cast.h"
++#include <papi.h>
++
++#include <stdio.h>
++
++void papi_start() {
++  PAPI_start_counters(Events, NUM_EVENTS);
++}
++
++void papi_stop() {
++  PAPI_read_counters(values, NUM_EVENTS);
++
++  printf("\nLoop Number Instrutions= %lld", values[0]);
++  printf("\nLoop Number Cycles= %lld", values[1]);
++  printf("\nLoop IPC= %f", (float)values[0]/values[1]);
++  printf("\nLoop L1D MPKI= %f", (float)(values[4])*1000/(values[0]));
++  printf("\nLoop L1I MPKI= %f", (float)(values[5])*1000/(values[0]));
++  printf("\nBpred Miss Rate= %f", (float)values[3]*100/values[2]);
++  printf("\n");
++  PAPI_stop_counters(values, NUM_EVENTS);
++}
++
++void papi_start_()
++{
++    papi_start();
++}
++
++void papi_stop_()
++{
++    papi_stop();
++}
+\ No newline at end of file
+diff --git a/NPB3.3-SER/common/papi_cast.h b/NPB3.3-SER/common/papi_cast.h
+new file mode 100644
+index 0000000..a21292a
+--- /dev/null
++++ b/NPB3.3-SER/common/papi_cast.h
+@@ -0,0 +1,15 @@
++#include <papi.h>
++#define NUM_EVENTS 6
++
++
++static int Events[NUM_EVENTS] = {PAPI_TOT_INS, PAPI_TOT_CYC, PAPI_BR_CN, PAPI_BR_MSP, PAPI_L1_DCM, PAPI_L1_ICM};
++static long long values[NUM_EVENTS];
++
++
++void papi_start();
++
++void papi_stop();
++
++void papi_start_();
++
++void papi_stop_();
+\ No newline at end of file
+diff --git a/NPB3.3-SER/config/NAS.samples/make.def_gcc_x86_bench_cast b/NPB3.3-SER/config/NAS.samples/make.def_gcc_x86_bench_cast
+new file mode 100644
+index 0000000..6e3008f
+--- /dev/null
++++ b/NPB3.3-SER/config/NAS.samples/make.def_gcc_x86_bench_cast
+@@ -0,0 +1,168 @@
++#---------------------------------------------------------------------------
++#
++#                SITE- AND/OR PLATFORM-SPECIFIC DEFINITIONS. 
++#
++#---------------------------------------------------------------------------
++
++#---------------------------------------------------------------------------
++# Items in this file will need to be changed for each platform.
++#---------------------------------------------------------------------------
++
++#---------------------------------------------------------------------------
++# Parallel Fortran:
++#
++# For CG, EP, FT, MG, LU, SP, BT and UA, which are in Fortran, the following 
++# must be defined:
++#
++# F77        - Fortran compiler
++# FFLAGS     - Fortran compilation arguments
++# F_INC      - any -I arguments required for compiling Fortran 
++# FLINK      - Fortran linker
++# FLINKFLAGS - Fortran linker arguments
++# F_LIB      - any -L and -l arguments required for linking Fortran 
++# 
++# compilations are done with $(F77) $(F_INC) $(FFLAGS) or
++#                            $(F77) $(FFLAGS)
++# linking is done with       $(FLINK) $(F_LIB) $(FLINKFLAGS)
++#---------------------------------------------------------------------------
++
++#---------------------------------------------------------------------------
++# This is the fortran compiler used for Fortran programs
++#---------------------------------------------------------------------------
++F77 = gfortran
++
++#---------------------------------------------------------------------------
++# This links fortran programs; usually the same as ${F77}
++#---------------------------------------------------------------------------
++FLINK	= $(F77)
++
++#---------------------------------------------------------------------------
++# These macros are passed to the linker 
++#---------------------------------------------------------------------------
++F_LIB  =
++
++#---------------------------------------------------------------------------
++# These macros are passed to the compiler 
++#---------------------------------------------------------------------------
++F_INC =
++
++#---------------------------------------------------------------------------
++# Global *compile time* flags for Fortran programs
++#---------------------------------------------------------------------------
++FFLAGS	= -O3 -mcmodel=medium
++
++#---------------------------------------------------------------------------
++# Global *link time* flags. Flags for increasing maximum executable 
++# size usually go here. 
++#---------------------------------------------------------------------------
++FLINKFLAGS = -O3 -mcmodel=medium -pthread -lrt
++
++
++#---------------------------------------------------------------------------
++# Parallel C:
++#
++# For IS and DC, which are in C, the following must be defined:
++#
++# CC         - C compiler 
++# CFLAGS     - C compilation arguments
++# C_INC      - any -I arguments required for compiling C 
++# CLINK      - C linker
++# CLINKFLAGS - C linker flags
++# C_LIB      - any -L and -l arguments required for linking C 
++#
++# compilations are done with $(CC) $(C_INC) $(CFLAGS) or
++#                            $(CC) $(CFLAGS)
++# linking is done with       $(CLINK) $(C_LIB) $(CLINKFLAGS)
++#---------------------------------------------------------------------------
++
++#---------------------------------------------------------------------------
++# This is the C compiler used for C programs
++#---------------------------------------------------------------------------
++CC = gcc
++
++#---------------------------------------------------------------------------
++# This links C programs; usually the same as ${CC}
++#---------------------------------------------------------------------------
++CLINK	= $(CC)
++
++#---------------------------------------------------------------------------
++# These macros are passed to the linker 
++#---------------------------------------------------------------------------
++C_LIB  = -lm
++
++#---------------------------------------------------------------------------
++# These macros are passed to the compiler 
++#---------------------------------------------------------------------------
++C_INC =
++
++#---------------------------------------------------------------------------
++# Global *compile time* flags for C programs
++# DC inspects the following flags (preceded by "-D"):
++#
++# IN_CORE - computes all views and checksums in main memory (if there is 
++# enough memory)
++#
++# VIEW_FILE_OUTPUT - forces DC to write the generated views to disk
++#
++# OPTIMIZATION - turns on some nonstandard DC optimizations
++#
++# _FILE_OFFSET_BITS=64 
++# _LARGEFILE64_SOURCE - are standard compiler flags which allow to work with 
++# files larger than 2GB.
++#---------------------------------------------------------------------------
++CFLAGS	= -O3 -mcmodel=medium
++
++#---------------------------------------------------------------------------
++# Global *link time* flags. Flags for increasing maximum executable 
++# size usually go here. 
++#---------------------------------------------------------------------------
++CLINKFLAGS = -O3 -mcmodel=medium -pthread -lrt
++
++
++#---------------------------------------------------------------------------
++# Utilities C:
++#
++# This is the C compiler used to compile C utilities.  Flags required by 
++# this compiler go here also; typically there are few flags required; hence 
++# there are no separate macros provided for such flags.
++#---------------------------------------------------------------------------
++UCC	= gcc
++
++
++#---------------------------------------------------------------------------
++# Destination of executables, relative to subdirs of the main directory. . 
++#---------------------------------------------------------------------------
++BINDIR	= ../bin
++
++
++#---------------------------------------------------------------------------
++# The variable RAND controls which random number generator 
++# is used. It is described in detail in README.install. 
++# Use "randi8" unless there is a reason to use another one. 
++# Other allowed values are "randi8_safe", "randdp" and "randdpvec"
++#---------------------------------------------------------------------------
++# RAND   = randi8
++# The following is highly reliable but may be slow:
++RAND   = randdp
++
++
++#---------------------------------------------------------------------------
++# The variable WTIME is the name of the wtime source code module in the
++# common directory.  
++# For most machines,       use wtime.c
++# For SGI power challenge: use wtime_sgi64.c
++#---------------------------------------------------------------------------
++WTIME  = wtime.c
++
++
++#---------------------------------------------------------------------------
++# Enable if either Cray or IBM: 
++# (no such flag for most machines: see common/wtime.h)
++# This is used by the C compiler to pass the machine name to common/wtime.h,
++# where the C/Fortran binding interface format is determined
++#---------------------------------------------------------------------------
++# MACHINE	=	-DCRAY
++# MACHINE	=	-DIBM
++
++# CKPT = -DBENCHCAST
++# CKPT = -DUSE_PAPI
+diff --git a/NPB3.3-SER/config/make.def.template b/NPB3.3-SER/config/make.def.template
+index b4a5181..827c80b 100644
+--- a/NPB3.3-SER/config/make.def.template
++++ b/NPB3.3-SER/config/make.def.template
+@@ -55,7 +55,7 @@ FFLAGS	= -O
+ # Global *link time* flags. Flags for increasing maximum executable 
+ # size usually go here. 
+ #---------------------------------------------------------------------------
+-FLINKFLAGS = -O
++FLINKFLAGS = -O -pthread -lrt
+ 
+ 
+ #---------------------------------------------------------------------------
+@@ -116,7 +116,7 @@ CFLAGS	= -O
+ # Global *link time* flags. Flags for increasing maximum executable 
+ # size usually go here. 
+ #---------------------------------------------------------------------------
+-CLINKFLAGS = -O
++CLINKFLAGS = -O -pthread -lrt
+ 
+ 
+ #---------------------------------------------------------------------------
+@@ -164,4 +164,5 @@ WTIME  = wtime.c
+ # MACHINE	=	-DCRAY
+ # MACHINE	=	-DIBM
+ 
+-
++#CKPT = -DBENCHCAST
++#CKPT = -DUSE_PAPI
+diff --git a/NPB3.3-SER/sys/make.common b/NPB3.3-SER/sys/make.common
+index e089415..229ca7c 100644
+--- a/NPB3.3-SER/sys/make.common
++++ b/NPB3.3-SER/sys/make.common
+@@ -47,6 +47,8 @@ ${COMMON}/wtime.o: ${COMMON}/${WTIME} ../config/make.def
+ ${COMMON}/c_wtime.o: ${COMMON}/${WTIME} ../config/make.def
+ 	cd ${COMMON}; ${CCOMPILE} -o c_wtime.o ${COMMON}/${WTIME}
+ 
++${COMMON}/barrier_cast.o: ${COMMON}/barrier_cast.c ../config/make.def
++	cd ${COMMON}; ${CCOMPILE} barrier_cast.c
+ 
+ # Normally setparams updates npbparams.h only if the settings (CLASS)
+ # have changed. However, we also want to update if the compile options
