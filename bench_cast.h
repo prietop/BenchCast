@@ -33,7 +33,7 @@ static int print_help;
 static void usage(char *argv0) {
 
   fprintf(stderr, "Usage: %s [-b] [-w] [-p number] [-n number] [-l number] "
-        "[-c config_name] [-v csv_filename] [-s seconds] [-r number]"
+        "[-c config_name] [-v csv_filename] [-s seconds] [-r number] [-m N]"
         "--<BENCH> [app1.cmd] [--<BENCH2> [app2.cmd] --<BENCH3> [app3.cmd] ...]\n", argv0);
   fprintf(stderr, "   BENCH.app is the program/s you want to cast. Applications usually"
         " require an aditional param to indicate the exact command line to execute\n"
@@ -57,6 +57,8 @@ static void usage(char *argv0) {
         " number of progs arguments passed. Should be used as a control\n");
   fprintf(stderr, "   -l Number of times the main loop of the ROI should be"
         " executed before the creation of the checkpoint (end of bench_cast)\n");
+  fprintf(stderr, "   -m Measure the behavior of the N first cores. BenchCast reserves those cores"
+        " so no benchmark is launched there (PAPI is assumed, but not needed).");
   fprintf(stderr, "        %s -c bench-cast -d -p 8 -n 2 -l 2 --NPB is.A --SPEC bwaves.2\n", argv0);
   fprintf(stderr, "      will run 4 instances of \"is.A \" and 4 instances of"
         " \"bwaves\" (with input bwaves_2) and stop after 2 loops of the ROI\n");
@@ -122,7 +124,7 @@ void handle_error (int retval)
 
 void get_options(int argc, char** argv, int* waiting, int* gem5_work_op, int* use_papi, char (*app)[MAX_APP_LENGTH], 
       char (*sub_app)[MAX_APP_LENGTH], char* config, int* num_processors, int* num_apps, int* num_loops, int* use_csv, int* sleep_sec, 
-      int* num_papi_loops, char* csv_filename)
+      int* num_papi_loops, char* csv_filename, int *initcore)
 {
     int option_index = 0;
     int app_index=0;
@@ -130,7 +132,7 @@ void get_options(int argc, char** argv, int* waiting, int* gem5_work_op, int* us
       
     while (c >= 0)
     {
-        c = getopt_long(argc, argv, "wbp:n:l:c:v:s:r:", long_options, &option_index);
+        c = getopt_long(argc, argv, "wbp:n:l:c:v:s:r:m:", long_options, &option_index);
 
         if(c == -1)
             break;
@@ -197,6 +199,13 @@ void get_options(int argc, char** argv, int* waiting, int* gem5_work_op, int* us
             case 'c':
             strcpy(config,optarg);
             printf("Config name: %s\n", config);
+            break;
+
+            case 'm':
+            *initcore=atoi(optarg);
+            printf("Measuring the behavior of first %d cores\n", *initcore);
+            if (*use_papi==0)
+                  fprintf(stderr, "WARNING! Not using PAPI with -m option\n");
             break;
 
             case 'v':
@@ -277,20 +286,24 @@ void get_options(int argc, char** argv, int* waiting, int* gem5_work_op, int* us
     }
 }
 
-void init_papi(pid_t* pids, int num_procs, int* EventSet, int* event_mask)
+void init_papi(pid_t* pids, int num_procs, int* EventSet, int* event_mask, int init_proc)
 {
       int retval;
       int i=0, count=0;
       pid_t temp_pid=0;
 
-      for(i=0; i<num_procs; i++)
+      for(i=0; i<num_procs+init_proc; i++)
+      {
+            EventSet[i]=PAPI_NULL;
+      }
+
+      for(i=init_proc; i<num_procs+init_proc; i++)
       {
             if(pids[i]<=0)
             {
                   fprintf(stderr,"Error, pid %d tiene un valor %d\n", i, pids[i]);
                   handle_error(1);
             }
-            EventSet[i]=PAPI_NULL;
             do
             {
                   char str[60] = "ps -o pid --ppid ";
@@ -322,7 +335,7 @@ void init_papi(pid_t* pids, int num_procs, int* EventSet, int* event_mask)
             fprintf(stderr,"Error in PAPI_library_init\n");
             handle_error(retval);
       }
-      for(i=0; i<num_procs; i++)
+      for(i=0; i<num_procs+init_proc; i++)
       {
             retval = PAPI_create_eventset(&(EventSet[i]));
             if (retval != PAPI_OK)
@@ -351,8 +364,35 @@ void init_papi(pid_t* pids, int num_procs, int* EventSet, int* event_mask)
                   fprintf(stderr, "PAPI_L3_TCA event not found");
             else
                   *event_mask |= L3ACCESSES;
+      }
+      for(i=0; i<init_proc; i++)
+      {
+            PAPI_granularity_option_t gran_opt;
+            PAPI_cpu_option_t cpu_opt;
+            gran_opt.def_cidx=0;
+            gran_opt.eventset=EventSet[i];
+            gran_opt.granularity=PAPI_GRN_SYS;
+            retval = PAPI_set_opt(PAPI_GRANUL,(PAPI_option_t*)&gran_opt);
+            if (retval != PAPI_OK) {
+                  printf("Unable to set PAPI_GRN_SYS\n");
+                  exit(1);
+            }
+            
+            cpu_opt.eventset=EventSet[i];
+            cpu_opt.cpu_num=i;
 
-            /* Attach this EventSet to the forked process */
+            retval = PAPI_set_opt(PAPI_CPU_ATTACH,(PAPI_option_t*)&cpu_opt);
+            if (retval != PAPI_OK) {
+                  if (retval==PAPI_EPERM) {
+                        printf("Permission error trying to CPU_ATTACH; need to run as root\n");
+                  }
+                  fprintf(stderr, "PAPI_CPU_ATTACH FAIL %d",retval);
+                  exit(1);
+            }
+      }
+      for(i=init_proc; i<num_procs+init_proc; i++)
+      {
+             /* Attach this EventSet to the forked process */
             retval=PAPI_attach(EventSet[i], pids[i]);
             if (retval != PAPI_OK)
             {
@@ -364,15 +404,15 @@ void init_papi(pid_t* pids, int num_procs, int* EventSet, int* event_mask)
 }
 
 void do_papi(int num_papi_loops, int num_secs, pid_t* pids, int num_procs, char (*apps)[MAX_APP_LENGTH], char (*sub_app)[MAX_APP_LENGTH], 
-            int num_apps, int use_csv, int* EventSet, char* csv_filename, int event_mask)
+            int num_apps, int use_csv, int* EventSet, char* csv_filename, int event_mask, int init_proc)
 {
       int retval, app_index;
-      long long values[num_procs][4];
+      long long values[num_procs+init_proc][4];
       int i=0, count=0;
       FILE *cfp, *pcfp;
       char periodic_filename[MAX_CWD];
 
-      for(i=0; i<num_procs; i++)
+      for(i=0; i<num_procs+init_proc; i++)
       {
             retval=PAPI_start(EventSet[i]);
             if (retval != PAPI_OK)
@@ -413,7 +453,8 @@ void do_papi(int num_papi_loops, int num_secs, pid_t* pids, int num_procs, char 
       for(count=0; count<num_papi_loops; count++)
       {
             sleep(num_secs);
-            for(i=0; i<num_procs; i++)
+            app_index=0;
+            for(i=0; i<num_procs+init_proc; i++)
             {
                   if (PAPI_read(EventSet[i], values[i]) != PAPI_OK)
                         handle_error(1);
@@ -423,33 +464,55 @@ void do_papi(int num_papi_loops, int num_secs, pid_t* pids, int num_procs, char 
                         ipc = ((float)values[i][1]) / ((float)values[i][0]);
                   if (values[i][1] > 0)
                         mpki = 1000.0*(((float)values[i][2]) / ((float)values[i][1]));
-                  app_index=i%num_apps;
+                  if(i>=init_proc)
+                  {
+                        strcpy(my_app,apps[app_index]);
+                        strcpy(my_sub_app,sub_app[app_index]);
+                        app_index++;
+                        app_index=app_index%num_apps;
+                  }
+                  else
+                  {
+                        strcpy(my_app,"Unknown");
+                        strcpy(my_sub_app, "Unknown");
+                  }
                   if(use_csv==1 && num_papi_loops>1)
                   {
-                        fprintf(pcfp, "CPU%d;%d;%lld;;instructions;%s-%s\n", i,count,values[i][1],apps[app_index],sub_app[app_index]);
-                        fprintf(pcfp, "CPU%d;%d;%lld;;cycles;%s-%s\n", i,count,values[i][0],apps[app_index],sub_app[app_index]);
-                        fprintf(pcfp, "CPU%d;%d;%.8f;;miss_rate;%s-%s\n", i,count,miss_rate,apps[app_index],sub_app[app_index]);
-                        fprintf(pcfp, "CPU%d;%d;%.8f;;MPKI;%s-%s\n", i,count,mpki,apps[app_index],sub_app[app_index]);
+                        fprintf(pcfp, "CPU%d;%d;%lld;;instructions;%s-%s\n", i,count,values[i][1],my_app,my_sub_app);
+                        fprintf(pcfp, "CPU%d;%d;%lld;;cycles;%s-%s\n", i,count,values[i][0],my_app,my_sub_app);
+                        fprintf(pcfp, "CPU%d;%d;%.8f;;miss_rate;%s-%s\n", i,count,miss_rate,my_app,my_sub_app);
+                        fprintf(pcfp, "CPU%d;%d;%.8f;;MPKI;%s-%s\n", i,count,mpki,my_app,my_sub_app);
                   } else
                   {
-                        printf("Loop %d, PID:%d - %s-%s\n", count, pids[i], apps[app_index],sub_app[app_index]);
-                        printf("%d-%s-%s Cycles %lld\n", count, apps[app_index],sub_app[app_index], values[i][0]);
-                        printf("%d-%s-%s Instructions %lld\n", count, apps[app_index],sub_app[app_index], values[i][1]);
-                        printf("%d-%s-%s L3 misses %lld\n", count, apps[app_index],sub_app[app_index], values[i][2]);
-                        printf("%d-%s-%s L3 accesses %lld\n", count, apps[app_index],sub_app[app_index], values[i][3]);
-                        printf("%d-%s-%s L3 Miss rate %.5f\n", count, apps[app_index],sub_app[app_index], miss_rate);
-                        printf("%d-%s-%s L3 MPKI %.5f\n", count, apps[app_index],sub_app[app_index], mpki);
-                        printf("%d-%s-%s IPC %.5f\n", count, apps[app_index],sub_app[app_index], ipc);
+                        printf("Loop %d, PID:%d - %s-%s\n", count, pids[i], my_app,my_sub_app);
+                        printf("%d-%s-%s Cycles %lld\n", i, my_app,my_sub_app, values[i][0]);
+                        printf("%d-%s-%s Instructions %lld\n", i, my_app,my_sub_app, values[i][1]);
+                        printf("%d-%s-%s L3 misses %lld\n", i, my_app,my_sub_app, values[i][2]);
+                        printf("%d-%s-%s L3 accesses %lld\n", i, my_app,my_sub_app, values[i][3]);
+                        printf("%d-%s-%s L3 Miss rate %.5f\n", i, my_app,my_sub_app, miss_rate);
+                        printf("%d-%s-%s L3 MPKI %.5f\n", i, my_app,my_sub_app, mpki);
+                        printf("%d-%s-%s IPC %.5f\n", i, my_app,my_sub_app, ipc);
                         printf("********************\n\n");
-                  }
-                  
-                  
+                  }                  
             }
       }
-
-      for(i=0; i<num_procs; i++)
+      printf("Ending PAPI\n");
+      app_index=0;
+      for(i=0; i<num_procs+init_proc; i++)
       {
-            app_index=i%num_apps;
+            if(i>=init_proc)
+            {
+                  strcpy(my_app,apps[app_index]);
+                  strcpy(my_sub_app,sub_app[app_index]);
+                  app_index++;
+                  app_index=app_index%num_apps;
+            }
+            else
+            {
+                  strcpy(my_app,"Unknown");
+                  strcpy(my_sub_app, "Unknown");
+            }
+            printf("Stopping PAPI %d\n", i);
             if (PAPI_stop(EventSet[i], values[i]) != PAPI_OK)
                   handle_error(4);
             if (values[i][3] > 0)
@@ -460,21 +523,21 @@ void do_papi(int num_papi_loops, int num_secs, pid_t* pids, int num_procs, char 
                   mpki = 1000.0*(((float)values[i][2]) / ((float)values[i][1]));
             if(use_csv==1)
             {
-                  fprintf(cfp, "CPU%d;%d;%lld;;instructions;%s-%s\n", i,count,values[i][1],apps[app_index],sub_app[app_index]);
-                  fprintf(cfp, "CPU%d;%d;%lld;;cycles;%s-%s\n", i,count,values[i][0],apps[app_index],sub_app[app_index]);
-                  fprintf(cfp, "CPU%d;%d;%.8f;;miss_rate;%s-%s\n", i,count,miss_rate,apps[app_index],sub_app[app_index]);
-                  fprintf(cfp, "CPU%d;%d;%.8f;;MPKI;%s-%s\n", i,count,mpki,apps[app_index],sub_app[app_index]);
+                  fprintf(cfp, "CPU%d;%d;%lld;;instructions;%s-%s\n", i,count,values[i][1],my_app,my_sub_app);
+                  fprintf(cfp, "CPU%d;%d;%lld;;cycles;%s-%s\n", i,count,values[i][0],my_app,my_sub_app);
+                  fprintf(cfp, "CPU%d;%d;%.8f;;miss_rate;%s-%s\n", i,count,miss_rate,my_app,my_sub_app);
+                  fprintf(cfp, "CPU%d;%d;%.8f;;MPKI;%s-%s\n", i,count,mpki,my_app,my_sub_app);
             }
             else
             {
-                  printf("END %d, PID:%d - %s-%s\n", count, pids[i], apps[app_index],sub_app[app_index]);
-                  printf("Final %d-%s-%s Cycles %lld\n", count, apps[app_index],sub_app[app_index], values[i][0]);
-                  printf("Final %d-%s-%s Instructions %lld\n", count, apps[app_index],sub_app[app_index], values[i][1]);
-                  printf("Final %d-%s-%s L3 misses %lld\n", count, apps[app_index],sub_app[app_index], values[i][2]);
-                  printf("Final %d-%s-%s L3 accesses %lld\n", count, apps[app_index],sub_app[app_index], values[i][3]);
-                  printf("Final %d-%s-%s L3 Miss rate %.5f\n", count, apps[app_index],sub_app[app_index], miss_rate);
-                  printf("Final %d-%s-%s L3 MPKI %.5f\n", count, apps[app_index],sub_app[app_index], mpki);
-                  printf("Final %d-%s-%s IPC %.5f\n", count, apps[app_index],sub_app[app_index], ipc);
+                  printf("END Loop %d, PID:%d - %s-%s\n", count, pids[i], my_app,my_sub_app);
+                  printf("Final %d-%s-%s Cycles %lld\n", i, my_app,my_sub_app, values[i][0]);
+                  printf("Final %d-%s-%s Instructions %lld\n", i, my_app,my_sub_app, values[i][1]);
+                  printf("Final %d-%s-%s L3 misses %lld\n", i, my_app,my_sub_app, values[i][2]);
+                  printf("Final %d-%s-%s L3 accesses %lld\n", i, my_app,my_sub_app, values[i][3]);
+                  printf("Final %d-%s-%s L3 Miss rate %.5f\n", i, my_app,my_sub_app, miss_rate);
+                  printf("Final %d-%s-%s L3 MPKI %.5f\n", i, my_app,my_sub_app, mpki);
+                  printf("Final %d-%s-%s IPC %.5f\n", i, my_app,my_sub_app, ipc);
                   printf("********************\n\n");
             }
             

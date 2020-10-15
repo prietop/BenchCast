@@ -71,7 +71,8 @@ int main (int argc, char **argv)
     int num_secs=60;
     int event_mask=0;
     char *csv_filename;
-
+    int init_proc=0;
+    int EventSet[max_num_processors];
     int *pid;
     static bench_barrier_t* my_barrier;
 
@@ -79,7 +80,13 @@ int main (int argc, char **argv)
     csv_filename = (char *)malloc(MAX_CWD * sizeof(char));
 
     get_options(argc, argv, &waiting, &gem5_work_op, &use_papi, app, sub_app, config, 
-                &num_processors, &num_apps, &num_loops, &use_csv, &num_secs, &num_papi_loops, csv_filename);
+                &num_processors, &num_apps, &num_loops, &use_csv, &num_secs, &num_papi_loops, csv_filename, &init_proc);
+
+    if((num_processors+init_proc)>max_num_processors)
+    {
+        fprintf(stderr, "ERROR! Number of processors in the system: %d, Requiring %d above %d",
+                max_num_processors, num_processors, init_proc);
+    }
 
     pid_t child_pid;
     
@@ -183,22 +190,23 @@ int main (int argc, char **argv)
         pid[proc] = -1;
     }
 
-    int init_proc=0;
-    //if(num_processors < max_num_processors)
-    //{
-        /* There will be at least one processor iddle and we will use it to
-        execute the OS */
-    //    printf("Devoting core 0 to OS\n");
-    //    init_proc=1;
-    //}
+    
+    if(init_proc>0)
+    {
+        /* BenchCast is executing alongside applications in the first N cores */
+        for(proc=0; proc<init_proc; proc++)
+        {
+            pid[proc]=-2;
+        }
+    }
 
     /* Fork a child process */
-    proc=0;
+    proc=init_proc;
     int app_index=0;
-    while(proc<num_processors)
+    while(proc<num_processors+init_proc)
     {
         pid[proc] = fork();
-        if(pid[proc] == -1)
+        if(pid[proc] < 0)
         {
             perror("[E] Error at fork()");
             return -3;
@@ -206,7 +214,7 @@ int main (int argc, char **argv)
         else if(pid[proc] == 0)
         {
             //child (app)
-            bind_pid(proc+init_proc, getpid());
+            bind_pid(proc, getpid());
             strcpy(my_bench, app[app_index]);
             my_sub_bench = sub_app[app_index];
             break;
@@ -221,19 +229,6 @@ int main (int argc, char **argv)
         app_index = app_index%num_apps;
     }
 
-    // To use with SIGALARM
-    /*
-    if(pid[proc]!=0)
-    {
-        printf("parent %d: send me SIGALRM 10 minutes later in case I am blocked\n", (int)getpid());
-        alarm(600);
-    }
-    else
-    {
-        printf("Child process %d in processor %d\n", (int)getpid(), proc);
-    }
-    */
-    int EventSet[num_processors];
     rc = -1;
     int numWaits=0;
     if(pid[proc]!=0 && waiting==1)
@@ -323,11 +318,11 @@ int main (int argc, char **argv)
     {
         //call PAPI (defined in .h)
         printf("Starting PAPI measures %d each %ds\n", num_papi_loops, num_secs);
-        do_papi(num_papi_loops, num_secs, pid, num_processors, app, sub_app, num_apps,use_csv, EventSet, csv_filename, event_mask);
+        do_papi(num_papi_loops, num_secs, pid, num_processors, app, sub_app, num_apps,use_csv, EventSet, csv_filename, event_mask, init_proc);
         printf("PAPI ENDED\n");
         fflush(stdout);
         fflush(stderr);
-        for(proc=0; proc<num_processors; proc++)
+        for(proc=init_proc; proc<num_processors+init_proc; proc++)
         {
             kill(pid[proc], SIGKILL);
             child_pid=wait(&status);
@@ -369,7 +364,7 @@ int main (int argc, char **argv)
     } else if(waiting==1)
     {
         /* parent */
-        for(proc=0;proc<num_processors;proc++)
+        for(proc=init_proc;proc<num_processors+init_proc;proc++)
         {
             child_pid = wait(&status);
             if( child_pid == -1)
