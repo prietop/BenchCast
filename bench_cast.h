@@ -51,8 +51,8 @@ static void usage(char *argv0) {
   fprintf(stderr, "   -s use papi library to analyze performance counters during "
          "N seconds\n");
   fprintf(stderr, "   -c SPEC config name\n");
-  fprintf(stderr, "   -v print papi results in a csv file (ASUME USING PAPI)\n");
-  fprintf(stderr, "   -r repeat papi measures N times (ASUME USING PAPI, and csv output)\n");
+  fprintf(stderr, "   -v print papi results in a csv file (PAPI IS ASSUMED)\n");
+  fprintf(stderr, "   -r repeat papi measures N times (PAPI IS ASSUMED, and csv output)\n");
   fprintf(stderr, "   -n Number of different programs to run. It defaults to the"
         " number of progs arguments passed. Should be used as a control\n");
   fprintf(stderr, "   -l Number of times the main loop of the ROI should be"
@@ -408,7 +408,8 @@ void do_papi(int num_papi_loops, int num_secs, pid_t* pids, int num_procs, char 
             }
       }
       float miss_rate = 0.0, ipc = 0.0, mpki = 0.0;
-
+      char my_app[MAX_APP_LENGTH];
+      char my_sub_app[MAX_APP_LENGTH];
       for(count=0; count<num_papi_loops; count++)
       {
             sleep(num_secs);

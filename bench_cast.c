@@ -238,21 +238,23 @@ int main (int argc, char **argv)
     int numWaits=0;
     if(pid[proc]!=0 && waiting==1)
     {
+        //Parent: Waiting in the barrier
         while(my_barrier->doWait)
         {
             fprintf(stderr,"Parent Waiting %d\n", numWaits);
             rc = pthread_barrier_wait(&my_barrier->barrier);
-            if(numWaits == 0 && use_papi == 1)
-            {
-                init_papi(pid, num_processors, EventSet, &event_mask);
-            }
             numWaits++;
             if(numWaits>=num_loops)
             { my_barrier->doWait=false; }
+            if(numWaits == 1 && use_papi == 1)
+            {
+                init_papi(pid, num_processors, EventSet, &event_mask, init_proc);
+            }
         }
     }
     else
     {
+        //Child: execute command
         fprintf(stderr, "%d executing %s %d\n", getpid(), my_bench, my_sub_bench);
         char my_cmd[MAX_APP_LENGTH];
         char my_app[MAX_APP_LENGTH];
@@ -283,9 +285,16 @@ int main (int argc, char **argv)
         }
     }
 
-    if(pid[proc] != 0 && gem5_work_op>0)
+    //No child should below this point
+    if(pid[proc]==0)
     {
-        //execute m5_work_begin_op
+        fprintf(stderr,"ERROR Wild Child Found\n");
+        exit(1);
+    }
+
+    if(gem5_work_op>0)
+    {
+        //Parent: execute m5_work_begin_op
 #ifdef GEM5
         m5_work_begin(0);
 #else
@@ -310,7 +319,7 @@ int main (int argc, char **argv)
         , getpid());
     }
 
-    if(pid[proc] != 0 && use_papi == 1)
+    if(use_papi == 1)
     {
         //call PAPI (defined in .h)
         printf("Starting PAPI measures %d each %ds\n", num_papi_loops, num_secs);
@@ -338,8 +347,26 @@ int main (int argc, char **argv)
                 printf("[I] %d status = %d\n", child_pid, status);
             }
         }
+        printf("[I] All done.\n");
+
+        /* Cleanup */
+        if(pthread_barrier_destroy(&my_barrier->barrier) != 0)
+        {
+            printf("[W] Error at pthread_barrier_destroy()");
+            return -3;
+        }
+
+        if((shm_unlink(shm_name)) != 0)
+        {
+            perror("[E] Error at shm_unlink()");
+            return -3;
+        }
+
+        printf("PASSED\n");
+        fflush(stdout);
+        fflush(stderr);
         return 0;
-    } else if(pid[proc] != 0 && waiting==1)
+    } else if(waiting==1)
     {
         /* parent */
         for(proc=0;proc<num_processors;proc++)
