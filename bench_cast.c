@@ -61,6 +61,8 @@ int main (int argc, char **argv)
     // options struct defined in bench_cast.h
     char app[max_num_processors][MAX_APP_LENGTH];
     char sub_app[max_num_processors][MAX_APP_LENGTH];
+    char event_list[MAX_NUM_EVENTS][MAX_EVENT_LENGTH];
+    int num_events;
     char my_bench[MAX_APP_LENGTH];
     char config[20] = "gem5";
     char* my_sub_bench;
@@ -69,7 +71,6 @@ int main (int argc, char **argv)
     int num_loops=1;
     int num_papi_loops=1;
     int num_secs=60;
-    int event_mask=0;
     char *csv_filename;
     int init_proc=0;
     int EventSet[max_num_processors];
@@ -243,7 +244,7 @@ int main (int argc, char **argv)
             { my_barrier->doWait=false; }
             if(numWaits == 1 && use_papi == 1)
             {
-                init_papi(pid, num_processors, EventSet, &event_mask, init_proc);
+                init_papi(pid, num_processors, EventSet, event_list, init_proc, &num_events);
             }
         }
     }
@@ -318,7 +319,7 @@ int main (int argc, char **argv)
     {
         //call PAPI (defined in .h)
         printf("Starting PAPI measures %d each %ds\n", num_papi_loops, num_secs);
-        do_papi(num_papi_loops, num_secs, pid, num_processors, app, sub_app, num_apps,use_csv, EventSet, csv_filename, event_mask, init_proc);
+        do_papi(num_papi_loops, num_secs, pid, num_processors, app, sub_app, num_apps,use_csv, EventSet, csv_filename, event_list, init_proc, num_events);
         printf("PAPI ENDED\n");
         fflush(stdout);
         fflush(stderr);

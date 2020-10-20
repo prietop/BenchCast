@@ -15,11 +15,9 @@ Author: Pablo Prieto Torralbo <prietop@unican.es>
 #include <unistd.h>
 
 #define MAX_CWD 600
-#define MAX_APP_LENGTH 20
-#define CYCLES 1
-#define INSTRUCTIONS 2
-#define L3MISSES 4
-#define L3ACCESSES 8
+#define MAX_APP_LENGTH 40
+#define MAX_EVENT_LENGTH 40
+#define MAX_NUM_EVENTS 20
 static const char shm_name[] = "tmp_pthread_barrierattr_getpshared";
 
 typedef struct bench_barrier {
@@ -286,7 +284,46 @@ void get_options(int argc, char** argv, int* waiting, int* gem5_work_op, int* us
     }
 }
 
-void init_papi(pid_t* pids, int num_procs, int* EventSet, int* event_mask, int init_proc)
+void create_event_set(int* EventSet, int cpu_num, char (*event_list)[MAX_EVENT_LENGTH], int* num_events)
+{
+      FILE * efp;
+      char * line = NULL;
+      size_t len = 0;
+      ssize_t read;
+      *num_events=0;
+      //Create event Set
+      int retval = PAPI_create_eventset(&(EventSet[cpu_num]));
+      if (retval != PAPI_OK)
+      {
+            fprintf(stderr, "Error in PAPI_create_eventset\n");
+            handle_error(retval);
+      }
+      //Add events to the event set and event list from BenchCast_PAPI_events.cfg
+      efp = fopen("BenchCast_PAPI_events.cfg", "r");
+      if (efp == NULL)
+      {
+            fprintf(stderr, "ERROR reading BenchCast_PAPI_events.cfg\n");
+            exit(1);
+      }
+      while ((read = getline(&line, &len, efp)) != -1) {
+            line[strcspn(line, "\r\n")] = 0;
+            retval=PAPI_add_named_event(EventSet[cpu_num], line);
+            if (retval != PAPI_OK)
+            {
+                  fprintf(stderr, "[PAPI] Not able to include %s event\n", line);
+                  fprintf(stderr, "PAPI Error %d: %s\n", retval, PAPI_strerror(retval));
+            }
+            else
+            {
+                  strcpy(event_list[*num_events], line);
+                  printf("[PAPI] Adding %s event to the list\n", event_list[*num_events]);
+                  *num_events=(*num_events)+1;
+            }
+      }
+      printf("\n[PAPI] Proc %d using %d counters of %d available\n", cpu_num, *num_events, PAPI_num_hwctrs());
+}
+
+void init_papi(pid_t* pids, int num_procs, int* EventSet, char (*event_list)[MAX_EVENT_LENGTH], int init_proc, int* num_events)
 {
       int retval;
       int i=0, count=0;
@@ -335,35 +372,25 @@ void init_papi(pid_t* pids, int num_procs, int* EventSet, int* event_mask, int i
             fprintf(stderr,"Error in PAPI_library_init\n");
             handle_error(retval);
       }
+      printf("[PAPI] Library Init OK\n");
+      int events_found=0;
       for(i=0; i<num_procs+init_proc; i++)
       {
-            retval = PAPI_create_eventset(&(EventSet[i]));
-            if (retval != PAPI_OK)
+            create_event_set(EventSet, i, event_list, num_events);
+            if(i==0)
             {
-                  fprintf(stderr, "Error in PAPI_create_eventset\n");
-                  handle_error(retval);
+                  events_found=*num_events;
+            }
+            else
+            {
+                  if(events_found!=*num_events)
+                  {
+                        fprintf(stderr, "ERROR, number of events found in proc %d is %d, while till now they were %d", 
+                              i, *num_events, events_found);
+                        exit(1);
+                  }
             }
             
-            retval=PAPI_add_named_event(EventSet[i], "PAPI_TOT_CYC");
-            if (retval != PAPI_OK)
-                  fprintf(stderr, "PAPI_TOT_CYC event not found");
-            else
-                  *event_mask |= CYCLES;
-            retval=PAPI_add_named_event(EventSet[i], "PAPI_TOT_INS");
-            if (retval != PAPI_OK)
-                  fprintf(stderr, "PAPI_TOT_INS event not found");
-            else
-                  *event_mask |= INSTRUCTIONS;
-            retval=PAPI_add_named_event(EventSet[i], "PAPI_L3_TCM");
-            if (retval != PAPI_OK)
-                  fprintf(stderr, "PAPI_L3_TCM event not found");
-            else
-                  *event_mask |= L3MISSES;
-            retval=PAPI_add_named_event(EventSet[i], "PAPI_L3_TCA");
-            if (retval != PAPI_OK)
-                  fprintf(stderr, "PAPI_L3_TCA event not found");
-            else
-                  *event_mask |= L3ACCESSES;
       }
       for(i=0; i<init_proc; i++)
       {
@@ -404,11 +431,11 @@ void init_papi(pid_t* pids, int num_procs, int* EventSet, int* event_mask, int i
 }
 
 void do_papi(int num_papi_loops, int num_secs, pid_t* pids, int num_procs, char (*apps)[MAX_APP_LENGTH], char (*sub_app)[MAX_APP_LENGTH], 
-            int num_apps, int use_csv, int* EventSet, char* csv_filename, int event_mask, int init_proc)
+            int num_apps, int use_csv, int* EventSet, char* csv_filename, char (*event_list)[MAX_EVENT_LENGTH], int init_proc, int num_events)
 {
       int retval, app_index;
-      long long values[num_procs+init_proc][4];
-      int i=0, count=0;
+      long long values[num_procs+init_proc][num_events];
+      int i=0, j=0, count=0;
       FILE *cfp, *pcfp;
       char periodic_filename[MAX_CWD];
 
@@ -447,7 +474,6 @@ void do_papi(int num_papi_loops, int num_secs, pid_t* pids, int num_procs, char 
                   }
             }
       }
-      float miss_rate = 0.0, ipc = 0.0, mpki = 0.0;
       char my_app[MAX_APP_LENGTH];
       char my_sub_app[MAX_APP_LENGTH];
       for(count=0; count<num_papi_loops; count++)
@@ -458,12 +484,7 @@ void do_papi(int num_papi_loops, int num_secs, pid_t* pids, int num_procs, char 
             {
                   if (PAPI_read(EventSet[i], values[i]) != PAPI_OK)
                         handle_error(1);
-                  if (values[i][3] > 0)
-                        miss_rate = ((float)values[i][2]) / ((float)values[i][3]);
-                  if (values[i][0] > 0)
-                        ipc = ((float)values[i][1]) / ((float)values[i][0]);
-                  if (values[i][1] > 0)
-                        mpki = 1000.0*(((float)values[i][2]) / ((float)values[i][1]));
+
                   if(i>=init_proc)
                   {
                         strcpy(my_app,apps[app_index]);
@@ -478,20 +499,18 @@ void do_papi(int num_papi_loops, int num_secs, pid_t* pids, int num_procs, char 
                   }
                   if(use_csv==1 && num_papi_loops>1)
                   {
-                        fprintf(pcfp, "CPU%d;%d;%lld;;instructions;%s-%s\n", i,count,values[i][1],my_app,my_sub_app);
-                        fprintf(pcfp, "CPU%d;%d;%lld;;cycles;%s-%s\n", i,count,values[i][0],my_app,my_sub_app);
-                        fprintf(pcfp, "CPU%d;%d;%.8f;;miss_rate;%s-%s\n", i,count,miss_rate,my_app,my_sub_app);
-                        fprintf(pcfp, "CPU%d;%d;%.8f;;MPKI;%s-%s\n", i,count,mpki,my_app,my_sub_app);
+                        for(j=0; j<num_events; j++)
+                        {
+                              fprintf(pcfp, "CPU%d;%d;%lld;;%s;%s-%s\n", i,count,values[i][j],event_list[j],my_app,my_sub_app);
+                        }
+
                   } else
                   {
                         printf("Loop %d, PID:%d - %s-%s\n", count, pids[i], my_app,my_sub_app);
-                        printf("%d-%s-%s Cycles %lld\n", i, my_app,my_sub_app, values[i][0]);
-                        printf("%d-%s-%s Instructions %lld\n", i, my_app,my_sub_app, values[i][1]);
-                        printf("%d-%s-%s L3 misses %lld\n", i, my_app,my_sub_app, values[i][2]);
-                        printf("%d-%s-%s L3 accesses %lld\n", i, my_app,my_sub_app, values[i][3]);
-                        printf("%d-%s-%s L3 Miss rate %.5f\n", i, my_app,my_sub_app, miss_rate);
-                        printf("%d-%s-%s L3 MPKI %.5f\n", i, my_app,my_sub_app, mpki);
-                        printf("%d-%s-%s IPC %.5f\n", i, my_app,my_sub_app, ipc);
+                        for(j=0; j<num_events; j++)
+                        {
+                              printf("%d-%s-%s %s %lld\n", i, my_app,my_sub_app,event_list[j], values[i][j]);
+                        }
                         printf("********************\n\n");
                   }                  
             }
@@ -515,29 +534,21 @@ void do_papi(int num_papi_loops, int num_secs, pid_t* pids, int num_procs, char 
             printf("Stopping PAPI %d\n", i);
             if (PAPI_stop(EventSet[i], values[i]) != PAPI_OK)
                   handle_error(4);
-            if (values[i][3] > 0)
-                  miss_rate = ((float)values[i][2]) / ((float)values[i][3]);
-            if (values[i][0] > 0)
-                  ipc = ((float)values[i][1]) / ((float)values[i][0]);
-            if (values[i][1] > 0)
-                  mpki = 1000.0*(((float)values[i][2]) / ((float)values[i][1]));
+
             if(use_csv==1)
             {
-                  fprintf(cfp, "CPU%d;%d;%lld;;instructions;%s-%s\n", i,count,values[i][1],my_app,my_sub_app);
-                  fprintf(cfp, "CPU%d;%d;%lld;;cycles;%s-%s\n", i,count,values[i][0],my_app,my_sub_app);
-                  fprintf(cfp, "CPU%d;%d;%.8f;;miss_rate;%s-%s\n", i,count,miss_rate,my_app,my_sub_app);
-                  fprintf(cfp, "CPU%d;%d;%.8f;;MPKI;%s-%s\n", i,count,mpki,my_app,my_sub_app);
+                  for(j=0; j<num_events; j++)
+                  {
+                        fprintf(pcfp, "CPU%d;%d;%lld;;%s;%s-%s\n", i,count,values[i][j],event_list[j],my_app,my_sub_app);
+                  }
             }
             else
             {
                   printf("END Loop %d, PID:%d - %s-%s\n", count, pids[i], my_app,my_sub_app);
-                  printf("Final %d-%s-%s Cycles %lld\n", i, my_app,my_sub_app, values[i][0]);
-                  printf("Final %d-%s-%s Instructions %lld\n", i, my_app,my_sub_app, values[i][1]);
-                  printf("Final %d-%s-%s L3 misses %lld\n", i, my_app,my_sub_app, values[i][2]);
-                  printf("Final %d-%s-%s L3 accesses %lld\n", i, my_app,my_sub_app, values[i][3]);
-                  printf("Final %d-%s-%s L3 Miss rate %.5f\n", i, my_app,my_sub_app, miss_rate);
-                  printf("Final %d-%s-%s L3 MPKI %.5f\n", i, my_app,my_sub_app, mpki);
-                  printf("Final %d-%s-%s IPC %.5f\n", i, my_app,my_sub_app, ipc);
+                  for(j=0; j<num_events; j++)
+                  {
+                        printf("%d-%s-%s %s %lld\n", i, my_app,my_sub_app, event_list[j], values[i][j]);
+                  }
                   printf("********************\n\n");
             }
             
