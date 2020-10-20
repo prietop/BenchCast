@@ -534,12 +534,11 @@ void do_papi(int num_papi_loops, int num_secs, pid_t* pids, int num_procs, char 
             printf("Stopping PAPI %d\n", i);
             if (PAPI_stop(EventSet[i], values[i]) != PAPI_OK)
                   handle_error(4);
-
             if(use_csv==1)
             {
                   for(j=0; j<num_events; j++)
                   {
-                        fprintf(pcfp, "CPU%d;%d;%lld;;%s;%s-%s\n", i,count,values[i][j],event_list[j],my_app,my_sub_app);
+                        fprintf(cfp, "CPU%d;%d;%lld;;%s;%s-%s\n", i,count,values[i][j],event_list[j],my_app,my_sub_app);
                   }
             }
             else
