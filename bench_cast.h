@@ -316,11 +316,11 @@ void create_event_set(int* EventSet, int cpu_num, char (*event_list)[MAX_EVENT_L
             else
             {
                   strcpy(event_list[*num_events], line);
-                  printf("[PAPI] Adding %s event to the list\n", event_list[*num_events]);
+                  //printf("[PAPI] Adding %s event to the list\n", event_list[*num_events]);
                   *num_events=(*num_events)+1;
             }
       }
-      printf("\n[PAPI] Proc %d using %d counters of %d available\n", cpu_num, *num_events, PAPI_num_hwctrs());
+      //printf("\n[PAPI] Proc %d using %d counters of %d available\n", cpu_num, *num_events, PAPI_num_hwctrs());
 }
 
 void init_papi(pid_t* pids, int num_procs, int* EventSet, char (*event_list)[MAX_EVENT_LENGTH], int init_proc, int* num_events)
@@ -341,6 +341,7 @@ void init_papi(pid_t* pids, int num_procs, int* EventSet, char (*event_list)[MAX
                   fprintf(stderr,"Error, pid %d tiene un valor %d\n", i, pids[i]);
                   handle_error(1);
             }
+            printf("Original PID: %d", pids[i]);
             do
             {
                   char str[60] = "ps -o pid --ppid ";
@@ -353,18 +354,18 @@ void init_papi(pid_t* pids, int num_procs, int* EventSet, char (*event_list)[MAX
                   if(retval==EOF)
                         break;
                   pclose(pfp);
-                  printf("Read %d\n", temp_pid);
+                  //printf("Read %d\n", temp_pid);
                   if((temp_pid > 0 && temp_pid != pids[i]))
                   {
-                        printf("PID %d now %d\n", pids[i], temp_pid);
+                        //printf("PID %d now %d\n", pids[i], temp_pid);
                         pids[i]=temp_pid;
                   }
                   else
                   {
                         temp_pid=0;
                   }
-                  
             } while(temp_pid > 0);
+            printf(" - Final PID: %d\n", pids[i]);
       }
       retval = PAPI_library_init(PAPI_VER_CURRENT);
       if(retval != PAPI_VER_CURRENT)
@@ -515,7 +516,7 @@ void do_papi(int num_papi_loops, int num_secs, pid_t* pids, int num_procs, char 
                   }                  
             }
       }
-      printf("Ending PAPI\n");
+      //printf("Ending PAPI\n");
       app_index=0;
       for(i=0; i<num_procs+init_proc; i++)
       {
