@@ -346,7 +346,7 @@ int main (int argc, char **argv)
         printf("[I] All done.\n");
 
         /* Cleanup */
-        if(pthread_barrier_destroy(&my_barrier->barrier) != 0)
+        /*if(pthread_barrier_destroy(&my_barrier->barrier) != 0)
         {
             printf("[W] Error at pthread_barrier_destroy()");
             return -3;
@@ -356,7 +356,7 @@ int main (int argc, char **argv)
         {
             perror("[E] Error at shm_unlink()");
             return -3;
-        }
+        }*/
 
         printf("PASSED\n");
         fflush(stdout);
