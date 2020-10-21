@@ -81,12 +81,14 @@ def getBenchCastSingleValue(file_path, metric='IPC'):
             index_col='Event', 
             sep = ';',
             names=['Core','N','Value', 'Units','Event', 'others'])
-    print(df)
+    #print(df)
     if metric == 'IPC':
-        instructions=df['Value']['instructions']
-        cycles=df['Value']['cycles']
+        instructions=df['Value']['PAPI_TOT_INS']
+        cycles=df['Value']['PAPI_TOT_CYC']
         ret_val.append(float(instructions)/float(cycles))
-    print(ret_val)
+    else:
+        ret_val.append(float(df['Value'][metric]))
+    #print(ret_val)
     return ret_val
 
 def getPerfHybridValues(file_path, num_cores, metric='IPC'):
@@ -95,16 +97,18 @@ def getPerfHybridValues(file_path, num_cores, metric='IPC'):
             index_col='Event', 
             sep = ';',
             names=['Core','N','Value', 'Units','Event', 'others'])
-    print(df)
+    #print(df)
     for x in range(num_cores):
         if metric == 'IPC':
-            instructions=df['Value']['instructions'][x]
-            cycles=df['Value']['cycles'][x]
+            instructions=df['Value']['PAPI_TOT_INS'][x]
+            cycles=df['Value']['PAPI_TOT_CYC'][x]
             if cycles > 0:
                 ret_val.append(float(instructions)/float(cycles))
             else:
                 ret_val.append(0.0)
-    print(ret_val)
+        else:
+            ret_val.append(float(df['Value'][metric][x]))
+    #print(ret_val)
     return ret_val
 
 
@@ -148,53 +152,56 @@ seed(os.getpid())
 
 original_dir=os.getcwd()
 output=os.path.join(original_dir,output_dir)
+events_file_name=os.path.join(original_dir,"BenchCast_PAPI_events.cfg")
 if not os.path.exists(output):
     os.makedirs(output)
 checkDir(output)
-if args.nosingle:
-    singlefile=os.path.join(output,"BENCHCAST-single-IPC.csv")
-    BENCHCASTsingleIPC = pandas.DataFrame(columns=['Bench','App','Cmd','IPC'])
-    for x in exp_list:
-        for y in exp_list[x]:
-            for z in exp_list[x][y]:
-                filename="papi-"+x+"-"+y+"-"+z+".csv"
-                outputfile=os.path.join(output,filename)
-                ipc = getBenchCastSingleValue(outputfile, 'IPC') 
-                BENCHCASTsingleIPC = BENCHCASTsingleIPC.append({'Bench': x, 'App': y, 'Cmd': z, 'IPC': ipc[0]}, ignore_index=True)
-    #BENCHCASTsingleIPC = pandas.read_csv(singlefile,index_col=0)
-	BENCHCASTsingleIPC.to_csv(singlefile)
+events_file=open(events_file_name, 'r')
+events=events_file.readlines() 
+event_list=[]
+for line in events:
+    event_list.append(line.strip())
+column_list=['Bench','App','Cmd','IPC']
+column_list.extend(event_list) 
+BENCHCASTsingleIPC = pandas.DataFrame(columns=column_list)
+singlefile=os.path.join(output,"BENCHCAST-single-IPC.csv")
 
-else:
-    BENCHCASTsingleIPC = pandas.DataFrame(columns=['Bench','App','Cmd','IPC'])
-    singlefile=os.path.join(output,"BENCHCAST-single-IPC.csv")
-    for x in exp_list:
-        print(x)
-        for y in exp_list[x]:
-            print(y)
-            for z in exp_list[x][y]:
-                print(z)
-                filename="papi-"+x+"-"+y+"-"+z+".csv"
-                outputfile=os.path.join(output,filename)
+for x in exp_list:
+    #print(x)
+    for y in exp_list[x]:
+        #print(y)
+        for z in exp_list[x][y]:
+            #print(z)
+            filename="papi-"+x+"-"+y+"-"+z+".csv"
+            outputfile=os.path.join(output,filename)
+            if not args.nosingle:
                 app_list=" --"+x+" "+y+"."+z
                 launchBenchCast(1,app_list,outputfile,config='spec-cast',spec_cast_seconds=spec_cast_seconds, rdt=args.userdt)
-                ipc = getBenchCastSingleValue(outputfile, 'IPC') 
-                BENCHCASTsingleIPC = BENCHCASTsingleIPC.append({'Bench': x, 'App': y, 'Cmd': z, 'IPC': ipc[0]}, ignore_index=True)
-	BENCHCASTsingleIPC.to_csv(singlefile)
+            ipc = getBenchCastSingleValue(outputfile, 'IPC')
+            BENCHCASTsingleIPC = BENCHCASTsingleIPC.append({'Bench': x, 'App': y, 'Cmd': z, 'IPC': ipc[0]}, ignore_index=True)
+            for event in event_list:
+                value=getBenchCastSingleValue(outputfile, event)
+                BENCHCASTsingleIPC.loc[BENCHCASTsingleIPC.index[-1], event]=value[0]
+BENCHCASTsingleIPC.to_csv(singlefile)
 
 count=0
+average_events=[]
+for event in event_list:
+    average_events.append('Avg_'+event)
+
 if args.infile:
     print("reading dataframe from %s" % args.infile)
     BENCHCASTSpeedUpDF = pandas.read_csv(args.infile,index_col=0)
     count=len(BENCHCASTSpeedUpDF.index)
 else:
-    BENCHCASTSpeedUpDF=pandas.DataFrame(columns=['Benchmark','IPCs','AvgIPC','AvgSpeedUp','GeoSpeedUp','HmeanSpeedUp', 'MaxSpeedUp', 'MinSpeedUp', 'MaxSUApp', 'MinSUApp', 'p', 'BestMetric','BestDistrib'])
+    column_list=['Benchmark','IPCs','AvgIPC','AvgSpeedUp','GeoSpeedUp','HmeanSpeedUp', 'MaxSpeedUp', 'MinSpeedUp', 'MaxSUApp', 'MinSUApp']
+    column_list.extend(event_list)
+    column_list.extend(average_events)
+    BENCHCASTSpeedUpDF=pandas.DataFrame(columns=column_list)
 
-best_metric='AvgSpeedUp'
-best_distrib='norm'
-best_test=0.0
 count=0
 
-while best_test < alpha or count < args.mintests:
+while count < args.mintests:
     for i in range(batch_size):
         bench=[]
         app=[]
@@ -224,7 +231,7 @@ while best_test < alpha or count < args.mintests:
             app_list="%s --%s %s.%s" % (app_list,bench[j],app[j],cmd[j])
         filename="papi-%dp-%dsec%s-%d.csv" %(num_cpus,spec_cast_seconds,sort_name,count)
         outputfile=os.path.join(output,filename)
-        open(outputfile, 'a').close()
+        #open(outputfile, 'a').close()
         launchBenchCast(num_cpus,app_list,outputfile,config='spec-cast',spec_cast_seconds=spec_cast_seconds, rdt=args.userdt)
         IPCs=getPerfHybridValues(outputfile, num_cpus, 'IPC')
         if 0.0 in IPCs:
@@ -249,19 +256,21 @@ while best_test < alpha or count < args.mintests:
         AvgSpeedUp=np.mean(SpeedUps)
         GeoSpeedUp=stats.mstats.gmean(SpeedUps)
         HmeanSpeedUp=stats.mstats.hmean(SpeedUps)
-        BENCHCASTSpeedUpDF.loc[len(BENCHCASTSpeedUpDF)]=[batch_name,IPCs,AvgIPC,AvgSpeedUp,GeoSpeedUp,HmeanSpeedUp,MaxSpeedUp,MinSpeedUp,MaxSUApp,MinSUApp,best_test,best_metric,best_distrib]
+        new_row={'Benchmark': batch_name, 'IPCs': IPCs,'AvgIPC': AvgIPC,'AvgSpeedUp': AvgSpeedUp,'GeoSpeedUp': GeoSpeedUp,
+                'HmeanSpeedUp': HmeanSpeedUp, 'MaxSpeedUp': MaxSpeedUp, 'MinSpeedUp': MinSpeedUp, 'MaxSUApp': MaxSUApp, 'MinSUApp': MinSUApp}
+        #BENCHCASTSpeedUpDF = BENCHCASTSpeedUpDF.append(new_row, ignore_index=True)
+        #BENCHCASTSpeedUpDF.loc[len(BENCHCASTSpeedUpDF)]=[batch_name,IPCs,AvgIPC,AvgSpeedUp,GeoSpeedUp,HmeanSpeedUp,MaxSpeedUp,MinSpeedUp,MaxSUApp,MinSUApp,best_test,best_metric,best_distrib]
+        #BENCHCASTSpeedUpDF.loc[len(BENCHCASTSpeedUpDF)]=pandas.DataFrame(new_row).iloc[0]
+        BENCHCASTSpeedUpDF = BENCHCASTSpeedUpDF.append(pandas.Series(new_row), ignore_index=True)
+        print new_row
+        print BENCHCASTSpeedUpDF
+        for event in event_list:
+            value=getPerfHybridValues(outputfile, num_cpus, event)
+            BENCHCASTSpeedUpDF.loc[BENCHCASTSpeedUpDF.index[-1], event]='['+','.join(map(str, value))+']'
+            #BENCHCASTSpeedUpDF.loc[BENCHCASTSpeedUpDF.index[-1], event]=str(value)
+            BENCHCASTSpeedUpDF.loc[BENCHCASTSpeedUpDF.index[-1], 'Avg_'+event]=np.mean(value)
         count=count+1
     """ end batch loop """
-    best_test=0.0
-    for metric in ['AvgSpeedUp','GeoSpeedUp','AvgIPC']:
-        for distribution in ['norm','lognorm']:
-            print("Testing %s %s" % (metric,distribution))
-            #test=normalityTest(BENCHCASTSpeedUpDF[metric], alpha, distribution)
-            test=0.5
-            if best_test < test:
-                best_test = test
-                best_metric = metric
-                best_distrib = distribution  
     BENCHCASTSpeedUpDF.to_csv(args.filename)
     
 printColor("THE END!", "green")
