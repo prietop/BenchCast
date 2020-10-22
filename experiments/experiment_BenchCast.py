@@ -186,8 +186,10 @@ BENCHCASTsingleIPC.to_csv(singlefile)
 
 count=0
 average_events=[]
+total_events=[]
 for event in event_list:
     average_events.append('Avg_'+event)
+    total_events.append('Total_'+event)
 
 if args.infile:
     print("reading dataframe from %s" % args.infile)
@@ -197,6 +199,7 @@ else:
     column_list=['Benchmark','IPCs','AvgIPC','AvgSpeedUp','GeoSpeedUp','HmeanSpeedUp', 'MaxSpeedUp', 'MinSpeedUp', 'MaxSUApp', 'MinSUApp']
     column_list.extend(event_list)
     column_list.extend(average_events)
+    column_list.extend(total_events)
     BENCHCASTSpeedUpDF=pandas.DataFrame(columns=column_list)
 
 count=0
@@ -258,17 +261,12 @@ while count < args.mintests:
         HmeanSpeedUp=stats.mstats.hmean(SpeedUps)
         new_row={'Benchmark': batch_name, 'IPCs': IPCs,'AvgIPC': AvgIPC,'AvgSpeedUp': AvgSpeedUp,'GeoSpeedUp': GeoSpeedUp,
                 'HmeanSpeedUp': HmeanSpeedUp, 'MaxSpeedUp': MaxSpeedUp, 'MinSpeedUp': MinSpeedUp, 'MaxSUApp': MaxSUApp, 'MinSUApp': MinSUApp}
-        #BENCHCASTSpeedUpDF = BENCHCASTSpeedUpDF.append(new_row, ignore_index=True)
-        #BENCHCASTSpeedUpDF.loc[len(BENCHCASTSpeedUpDF)]=[batch_name,IPCs,AvgIPC,AvgSpeedUp,GeoSpeedUp,HmeanSpeedUp,MaxSpeedUp,MinSpeedUp,MaxSUApp,MinSUApp,best_test,best_metric,best_distrib]
-        #BENCHCASTSpeedUpDF.loc[len(BENCHCASTSpeedUpDF)]=pandas.DataFrame(new_row).iloc[0]
         BENCHCASTSpeedUpDF = BENCHCASTSpeedUpDF.append(pandas.Series(new_row), ignore_index=True)
-        print new_row
-        print BENCHCASTSpeedUpDF
         for event in event_list:
             value=getPerfHybridValues(outputfile, num_cpus, event)
             BENCHCASTSpeedUpDF.loc[BENCHCASTSpeedUpDF.index[-1], event]='['+','.join(map(str, value))+']'
-            #BENCHCASTSpeedUpDF.loc[BENCHCASTSpeedUpDF.index[-1], event]=str(value)
             BENCHCASTSpeedUpDF.loc[BENCHCASTSpeedUpDF.index[-1], 'Avg_'+event]=np.mean(value)
+            BENCHCASTSpeedUpDF.loc[BENCHCASTSpeedUpDF.index[-1], 'Total_'+event]=np.sum(value)
         count=count+1
     """ end batch loop """
     BENCHCASTSpeedUpDF.to_csv(args.filename)
