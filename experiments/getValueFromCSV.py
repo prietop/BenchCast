@@ -28,13 +28,13 @@ def checkDir(dir_to_check):
 def printColor(string_to_print,color):
     """Prints messages to stdout of a defined color"""
     if color== "green":
-        print bcolors.OKGREEN + string_to_print + bcolors.ENDC
+        print(bcolors.OKGREEN + string_to_print + bcolors.ENDC)
     elif color== "red":
-        print bcolors.FAIL + string_to_print + bcolors.ENDC
+        print(bcolors.FAIL + string_to_print + bcolors.ENDC)
     elif color== "blue":
-        print bcolors.BLUE + string_to_print + bcolors.ENDC
+        print(bcolors.BLUE + string_to_print + bcolors.ENDC)
     else:
-        print bcolors.FAIL + "Bad color argument to print" + bcolors.ENDC
+        print(bcolors.FAIL + "Bad color argument to print" + bcolors.ENDC)
 
 def getPerfHybridValues(file_path, num_cores, metric='IPC'):
     ret_val=[]
@@ -43,6 +43,9 @@ def getPerfHybridValues(file_path, num_cores, metric='IPC'):
             sep = ';',
             names=['Core','N','Value', 'Units','Event', 'others'])
     #print file_path
+    if df.empty:
+        printColor("Nothing found at %s"% file_path, "red")
+        exit()
     for x in range(num_cores):
         if metric == 'IPC':
             instructions=df['Value']['PAPI_TOT_INS'][x]

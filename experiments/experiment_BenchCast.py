@@ -98,6 +98,9 @@ def getPerfHybridValues(file_path, num_cores, metric='IPC'):
             sep = ';',
             names=['Core','N','Value', 'Units','Event', 'others'])
     #print(df)
+    if df.empty:
+        printColor("Nothing found at %s"% file_path, "red")
+        exit()
     for x in range(num_cores):
         if metric == 'IPC':
             instructions=df['Value']['PAPI_TOT_INS'][x]
