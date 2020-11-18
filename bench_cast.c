@@ -64,7 +64,8 @@ int main (int argc, char **argv)
     char event_list[MAX_NUM_EVENTS][MAX_EVENT_LENGTH];
     int num_events;
     char my_bench[MAX_APP_LENGTH];
-    char config[20] = "gem5";
+    char config[MAX_APP_LENGTH] = "gem5";
+    char events_file[MAX_APP_LENGTH] = "BenchCast_PAPI_events.cfg";
     char* my_sub_bench;
     int num_processors=0;
     int num_apps=0;
@@ -81,7 +82,8 @@ int main (int argc, char **argv)
     csv_filename = (char *)malloc(MAX_CWD * sizeof(char));
 
     get_options(argc, argv, &waiting, &gem5_work_op, &use_papi, app, sub_app, config, 
-                &num_processors, &num_apps, &num_loops, &use_csv, &num_secs, &num_papi_loops, csv_filename, &init_proc);
+                &num_processors, &num_apps, &num_loops, &use_csv, &num_secs, 
+                &num_papi_loops, csv_filename, &init_proc, events_file);
 
     if((num_processors+init_proc)>max_num_processors)
     {
@@ -244,7 +246,7 @@ int main (int argc, char **argv)
             { my_barrier->doWait=false; }
             if(numWaits == 1 && use_papi == 1)
             {
-                init_papi(pid, num_processors, EventSet, event_list, init_proc, &num_events);
+                init_papi(pid, num_processors, EventSet, event_list, init_proc, &num_events, events_file);
             }
         }
     }

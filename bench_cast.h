@@ -30,8 +30,8 @@ static int print_help;
 
 static void usage(char *argv0) {
 
-  fprintf(stderr, "Usage: %s [-b] [-w] [-p number] [-n number] [-l number] "
-        "[-c config_name] [-v csv_filename] [-s seconds] [-r number] [-m N]"
+  fprintf(stderr, "Usage: %s [-b] [-w] [-p number] [-n number] [-l number] [-m N]"
+        "[-c config_name] [-v csv_filename] [-s seconds] [-r number] [-e events_file]"
         "--<BENCH> [app1.cmd] [--<BENCH2> [app2.cmd] --<BENCH3> [app3.cmd] ...]\n", argv0);
   fprintf(stderr, "   BENCH.app is the program/s you want to cast. Applications usually"
         " require an aditional param to indicate the exact command line to execute\n"
@@ -49,6 +49,7 @@ static void usage(char *argv0) {
   fprintf(stderr, "   -s use papi library to analyze performance counters during "
          "N seconds\n");
   fprintf(stderr, "   -c SPEC config name\n");
+  fprintf(stderr, "   -e event list file name\n");
   fprintf(stderr, "   -v print papi results in a csv file (PAPI IS ASSUMED)\n");
   fprintf(stderr, "   -r repeat papi measures N times (PAPI IS ASSUMED, and csv output)\n");
   fprintf(stderr, "   -n Number of different programs to run. It defaults to the"
@@ -122,7 +123,7 @@ void handle_error (int retval)
 
 void get_options(int argc, char** argv, int* waiting, int* gem5_work_op, int* use_papi, char (*app)[MAX_APP_LENGTH], 
       char (*sub_app)[MAX_APP_LENGTH], char* config, int* num_processors, int* num_apps, int* num_loops, int* use_csv, int* sleep_sec, 
-      int* num_papi_loops, char* csv_filename, int *initcore)
+      int* num_papi_loops, char* csv_filename, int *initcore, char* events_file)
 {
     int option_index = 0;
     int app_index=0;
@@ -130,7 +131,7 @@ void get_options(int argc, char** argv, int* waiting, int* gem5_work_op, int* us
       
     while (c >= 0)
     {
-        c = getopt_long(argc, argv, "wbp:n:l:c:v:s:r:m:", long_options, &option_index);
+        c = getopt_long(argc, argv, "wbp:n:l:c:v:s:r:m:e:", long_options, &option_index);
 
         if(c == -1)
             break;
@@ -204,6 +205,11 @@ void get_options(int argc, char** argv, int* waiting, int* gem5_work_op, int* us
             printf("Measuring the behavior of first %d cores\n", *initcore);
             if (*use_papi==0)
                   fprintf(stderr, "WARNING! Not using PAPI with -m option\n");
+            break;
+
+            case 'e':
+            strcpy(events_file,optarg);
+            printf("Events file name: %s\n", events_file);
             break;
 
             case 'v':
@@ -284,7 +290,8 @@ void get_options(int argc, char** argv, int* waiting, int* gem5_work_op, int* us
     }
 }
 
-void create_event_set(int* EventSet, int cpu_num, char (*event_list)[MAX_EVENT_LENGTH], int* num_events)
+void create_event_set(int* EventSet, int cpu_num, char (*event_list)[MAX_EVENT_LENGTH], 
+                        int* num_events, char* events_file)
 {
       FILE * efp;
       char * line = NULL;
@@ -299,7 +306,7 @@ void create_event_set(int* EventSet, int cpu_num, char (*event_list)[MAX_EVENT_L
             handle_error(retval);
       }
       //Add events to the event set and event list from BenchCast_PAPI_events.cfg
-      efp = fopen("BenchCast_PAPI_events.cfg", "r");
+      efp = fopen(events_file, "r");
       if (efp == NULL)
       {
             fprintf(stderr, "ERROR reading BenchCast_PAPI_events.cfg\n");
@@ -323,7 +330,8 @@ void create_event_set(int* EventSet, int cpu_num, char (*event_list)[MAX_EVENT_L
       //printf("\n[PAPI] Proc %d using %d counters of %d available\n", cpu_num, *num_events, PAPI_num_hwctrs());
 }
 
-void init_papi(pid_t* pids, int num_procs, int* EventSet, char (*event_list)[MAX_EVENT_LENGTH], int init_proc, int* num_events)
+void init_papi(pid_t* pids, int num_procs, int* EventSet, char (*event_list)[MAX_EVENT_LENGTH], 
+                  int init_proc, int* num_events, char* events_file)
 {
       int retval;
       int i=0, count=0;
@@ -377,7 +385,7 @@ void init_papi(pid_t* pids, int num_procs, int* EventSet, char (*event_list)[MAX
       int events_found=0;
       for(i=0; i<num_procs+init_proc; i++)
       {
-            create_event_set(EventSet, i, event_list, num_events);
+            create_event_set(EventSet, i, event_list, num_events, events_file);
             if(i==0)
             {
                   events_found=*num_events;
@@ -431,8 +439,9 @@ void init_papi(pid_t* pids, int num_procs, int* EventSet, char (*event_list)[MAX
       printf("PAPI initialization done\n");
 }
 
-void do_papi(int num_papi_loops, int num_secs, pid_t* pids, int num_procs, char (*apps)[MAX_APP_LENGTH], char (*sub_app)[MAX_APP_LENGTH], 
-            int num_apps, int use_csv, int* EventSet, char* csv_filename, char (*event_list)[MAX_EVENT_LENGTH], int init_proc, int num_events)
+void do_papi(int num_papi_loops, int num_secs, pid_t* pids, int num_procs, char (*apps)[MAX_APP_LENGTH], 
+            char (*sub_app)[MAX_APP_LENGTH], int num_apps, int use_csv, int* EventSet, 
+            char* csv_filename, char (*event_list)[MAX_EVENT_LENGTH], int init_proc, int num_events)
 {
       int retval, app_index;
       long long values[num_procs+init_proc][num_events];
