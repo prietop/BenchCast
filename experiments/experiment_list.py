@@ -10,7 +10,8 @@ lbm = {"1"}
 omnetpp = {"1"}
 wrf = {"1"}
 xalanbmk = {"1"}
-x264 = {"1", "2", "3"}
+## x264 = {"1", "2", "3"}
+x264 = {"1", "3"}
 blender = {"1"}
 cam4 = {"1"}
 deepsjeng = {"1"}
@@ -37,14 +38,14 @@ SPEC = {
     # "perlbench" : perlbench,
     # "gcc" : gcc,
     # "bwaves" : bwaves,
-##    "mcf" : mcf,
-##    "cactuBSSN" : cactuBSSN,
-##    "namd" : namd,
-    "parest" : parest,
+    "mcf" : mcf,
+    ## "cactuBSSN" : cactuBSSN,
+    "namd" : namd,
+    ## "parest" : parest,
     "povray" : povray,
     "lbm" : lbm,
-##    "omnetpp" : omnetpp,
-##    "wrf" : wrf,
+    "omnetpp" : omnetpp,
+    "wrf" : wrf,
     # "xalancbmk" : xalanbmk,
     "x264" : x264, 
     "blender" : blender,
@@ -52,7 +53,7 @@ SPEC = {
     "deepsjeng" : deepsjeng,
     "imagick" : imagick,
     "leela" : leela,
-##    "nab" : nab,
+    "nab" : nab,
     "exchange2" : exchange2,
     "fotonik3d" : fotonik3d,
     "roms" : roms,
@@ -81,14 +82,14 @@ freqmine = {"1"}
 raytrace = {"1"}
 swaptions = {"1"}
 vips = {"1"}
-x264 = {"1"}
+par_x264 = {"1"}
 canneal = {"1"}
 dedup = {"1"}
 streamcluster = {"1"}
 
 PARSEC = {
     "blackscholes": blackscholes,
-    "bodytrack": bodytrack,
+    ## "bodytrack": bodytrack,
     "facesim": facesim,
 #    "ferret": ferret,
     "fluidanimate": fluidanimate,
@@ -96,7 +97,7 @@ PARSEC = {
 #    "raytrace": raytrace,
     "swaptions": swaptions,
 #    "vips": vips,
-#    "x264": x264,
+#    "x264": par_x264,
     "canneal": canneal,
     "dedup": dedup,
     "streamcluster": streamcluster
