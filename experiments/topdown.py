@@ -167,14 +167,18 @@ if args.reffile:
     refdata = pandas.read_csv(args.reffile,index_col=0)
     benchmarks=refdata['Benchmark']
     for b in benchmarks:
-        app_list=b.split('-')
-        app_list.pop(0)
-        print app_list
+        bench_split=b.split('-')
+        bench_split.pop(0) #First element is null
+        print bench_split
+        app_list=""
+        for t in bench_split:
+            app=t.split('.')
+            app_list="%s --%s %s.%s" % (app_list,app[0],app[1],app[2])
         filename="papi-%dp-%dsec%s-%d.csv" %(num_cpus,spec_cast_seconds,b,count)
         outputfile=os.path.join(output,filename)
         open(outputfile, 'a').close()
         launchBenchCast(num_cpus,app_list,outputfile,config='spec-cast',spec_cast_seconds=spec_cast_seconds, event_file=events_file_name, rdt=args.userdt)
-        new_row={'Benchmark': sort_name}
+        new_row={'Benchmark': b}
         BENCHCASTS_DF = BENCHCASTS_DF.append(pandas.Series(new_row), ignore_index=True)
         for event in event_list:
             value=getPerfHybridValues(outputfile, num_cpus, event)
@@ -205,7 +209,7 @@ else:
                 cmd.append(list(current_app)[cmd_num])
                 print("--%s %s.%s" % (bench[n],app[n],cmd[n]))
                 j = n
-                sort_name="%s-%s.%s" %(sort_name, app[j], cmd[j])
+                sort_name="%s-%s.%s.%s" %(sort_name, bench[j], app[j], cmd[j])
             else:
                 j = n%max_apps
             batch_name="%s-%s.%s" %(batch_name, app[j], cmd[j])
