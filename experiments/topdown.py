@@ -167,9 +167,9 @@ if args.reffile:
     refdata = pandas.read_csv(args.reffile,index_col=0)
     benchmarks=refdata['Benchmark']
     for b in benchmarks:
-        app=b.split('-')
-        app.pop(0)
-        print app
+        app_list=b.split('-')
+        app_list.pop(0)
+        print app_list
         filename="papi-%dp-%dsec%s-%d.csv" %(num_cpus,spec_cast_seconds,b,count)
         outputfile=os.path.join(output,filename)
         open(outputfile, 'a').close()
