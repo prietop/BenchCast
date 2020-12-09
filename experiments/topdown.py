@@ -92,8 +92,6 @@ def getPerfHybridValues(file_path, num_cores, metric):
 
 
 parser = argparse.ArgumentParser(description='')
-parser.add_argument('--batch', type=int, default=1,
-                    help='Number of test to execute each batch')
 parser.add_argument('--mintests', type=int, default=1,
                     help='minimum Number of test to execute')
 parser.add_argument('--alpha', type=float, default=0.5,
@@ -114,12 +112,13 @@ parser.add_argument('--num_procs', type=int,
                     help='Number of processors')
 parser.add_argument('--eventfile', type=str, action="store", 
                     help='Name of the file with the event list')
+parser.add_argument('--reffile', type=str, action="store", 
+                    help='Name of the input file csv to get the experiments')
 
 
 args = parser.parse_args()
 
 output_dir=args.outdir
-batch_size=args.batch
 alpha=args.alpha
 spec_cast_seconds=args.seconds
 max_apps = args.max_apps
@@ -153,19 +152,39 @@ for event in event_list:
 
 if args.infile:
     print("reading dataframe from %s" % args.infile)
-    BENCHCASTSpeedUpDF = pandas.read_csv(args.infile,index_col=0)
-    count=len(BENCHCASTSpeedUpDF.index)
+    BENCHCASTS_DF = pandas.read_csv(args.infile,index_col=0)
+    count=len(BENCHCASTS_DF.index)
 else:
     column_list=['Benchmark']
     column_list.extend(event_list)
     column_list.extend(average_events)
     column_list.extend(total_events)
-    BENCHCASTSpeedUpDF=pandas.DataFrame(columns=column_list)
+    BENCHCASTS_DF=pandas.DataFrame(columns=column_list)
 
 count=0
 
-while count < args.mintests:
-    for i in range(batch_size):
+if args.reffile:
+    refdata = pandas.read_csv(args.reffile,index_col=0)
+    benchmarks=refdata['Benchmark']
+    for b in benchmarks:
+        app=b.split('-')
+        app.pop(0)
+        print app
+        filename="papi-%dp-%dsec%s-%d.csv" %(num_cpus,spec_cast_seconds,b,count)
+        outputfile=os.path.join(output,filename)
+        open(outputfile, 'a').close()
+        launchBenchCast(num_cpus,app_list,outputfile,config='spec-cast',spec_cast_seconds=spec_cast_seconds, event_file=events_file_name, rdt=args.userdt)
+        new_row={'Benchmark': sort_name}
+        BENCHCASTS_DF = BENCHCASTS_DF.append(pandas.Series(new_row), ignore_index=True)
+        for event in event_list:
+            value=getPerfHybridValues(outputfile, num_cpus, event)
+            BENCHCASTS_DF.loc[BENCHCASTS_DF.index[-1], event]='['+','.join(map(str, value))+']'
+            BENCHCASTS_DF.loc[BENCHCASTS_DF.index[-1], 'Avg_'+event]=np.mean(value)
+            BENCHCASTS_DF.loc[BENCHCASTS_DF.index[-1], 'Total_'+event]=np.sum(value)
+        count=count+1
+        BENCHCASTS_DF.to_csv(args.filename)
+else:
+    while count < args.mintests:
         bench=[]
         app=[]
         cmd=[]
@@ -186,25 +205,24 @@ while count < args.mintests:
                 cmd.append(list(current_app)[cmd_num])
                 print("--%s %s.%s" % (bench[n],app[n],cmd[n]))
                 j = n
+                sort_name="%s-%s.%s" %(sort_name, app[j], cmd[j])
             else:
                 j = n%max_apps
             batch_name="%s-%s.%s" %(batch_name, app[j], cmd[j])
-            if n < max_apps:
-                sort_name="%s-%s.%s" %(sort_name, app[j], cmd[j])
             app_list="%s --%s %s.%s" % (app_list,bench[j],app[j],cmd[j])
         filename="papi-%dp-%dsec%s-%d.csv" %(num_cpus,spec_cast_seconds,sort_name,count)
         outputfile=os.path.join(output,filename)
         open(outputfile, 'a').close()
         launchBenchCast(num_cpus,app_list,outputfile,config='spec-cast',spec_cast_seconds=spec_cast_seconds, event_file=events_file_name, rdt=args.userdt)
-        new_row={'Benchmark': batch_name}
-        BENCHCASTSpeedUpDF = BENCHCASTSpeedUpDF.append(pandas.Series(new_row), ignore_index=True)
+        #new_row={'Benchmark': batch_name}
+        new_row={'Benchmark': sort_name}
+        BENCHCASTS_DF = BENCHCASTS_DF.append(pandas.Series(new_row), ignore_index=True)
         for event in event_list:
             value=getPerfHybridValues(outputfile, num_cpus, event)
-            BENCHCASTSpeedUpDF.loc[BENCHCASTSpeedUpDF.index[-1], event]='['+','.join(map(str, value))+']'
-            BENCHCASTSpeedUpDF.loc[BENCHCASTSpeedUpDF.index[-1], 'Avg_'+event]=np.mean(value)
-            BENCHCASTSpeedUpDF.loc[BENCHCASTSpeedUpDF.index[-1], 'Total_'+event]=np.sum(value)
+            BENCHCASTS_DF.loc[BENCHCASTS_DF.index[-1], event]='['+','.join(map(str, value))+']'
+            BENCHCASTS_DF.loc[BENCHCASTS_DF.index[-1], 'Avg_'+event]=np.mean(value)
+            BENCHCASTS_DF.loc[BENCHCASTS_DF.index[-1], 'Total_'+event]=np.sum(value)
         count=count+1
-    """ end batch loop """
-    BENCHCASTSpeedUpDF.to_csv(args.filename)
+        BENCHCASTS_DF.to_csv(args.filename)
     
 printColor("THE END!", "green")
