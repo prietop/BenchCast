@@ -161,8 +161,6 @@ else:
     column_list.extend(total_events)
     BENCHCASTS_DF=pandas.DataFrame(columns=column_list)
 
-count=0
-
 if args.reffile:
     refdata = pandas.read_csv(args.reffile,index_col=0)
     benchmarks=refdata['Benchmark']
