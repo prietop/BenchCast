@@ -1,0 +1,671 @@
+diff --git a/pkgs/apps/blackscholes/parsec/gcc-serial.bldconf b/pkgs/apps/blackscholes/parsec/gcc-serial.bldconf
+index 94cdd34b..60f9cd35 100644
+--- a/pkgs/apps/blackscholes/parsec/gcc-serial.bldconf
++++ b/pkgs/apps/blackscholes/parsec/gcc-serial.bldconf
+@@ -5,3 +5,19 @@ source ${PARSECDIR}/pkgs/apps/blackscholes/parsec/gcc.bldconf
+ # Override build environment
+ build_env="version=serial"
+ 
++# Package dependencies
++build_deps="hooks"
++
++# Enable PARSEC hooks
++CFLAGS="${CFLAGS} -DENABLE_PARSEC_HOOKS -I${PARSECDIR}/pkgs/libs/hooks/inst/${PARSECPLAT}/include"
++CXXFLAGS="${CXXFLAGS} -DENABLE_PARSEC_HOOKS -I${PARSECDIR}/pkgs/libs/hooks/inst/${PARSECPLAT}/include"
++LDFLAGS="${LDFLAGS} -L${PARSECDIR}/pkgs/libs/hooks/inst/${PARSECPLAT}/lib"
++LIBS="${LIBS} -lhooks"
++
++# Add directory with hooks library to library search path
++if [ -z "${LD_LIBRARY_PATH}" ]; then
++  export LD_LIBRARY_PATH="${PARSECDIR}/pkgs/libs/hooks/inst/${PARSECPLAT}/lib"
++else
++  export LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:${PARSECDIR}/pkgs/libs/hooks/inst/${PARSECPLAT}/lib"
++fi
++
+diff --git a/pkgs/apps/blackscholes/src/blackscholes.c b/pkgs/apps/blackscholes/src/blackscholes.c
+index 559628d0..bd5cc1d4 100644
+--- a/pkgs/apps/blackscholes/src/blackscholes.c
++++ b/pkgs/apps/blackscholes/src/blackscholes.c
+@@ -281,8 +281,13 @@ int bs_thread(void *tid_ptr) {
+     int tid = *(int *)tid_ptr;
+     int start = tid * (numOptions / nThreads);
+     int end = start + (numOptions / nThreads);
+-
++#ifdef ENABLE_PARSEC_HOOKS
++    initialize_barrier();
++#endif
+     for (j=0; j<NUM_RUNS; j++) {
++#ifdef ENABLE_PARSEC_HOOKS
++        call_barrier();
++#endif
+ #ifdef ENABLE_OPENMP
+ #pragma omp parallel for private(i, price, priceDelta)
+         for (i=0; i<numOptions; i++) {
+diff --git a/pkgs/apps/bodytrack/parsec/gcc-serial.bldconf b/pkgs/apps/bodytrack/parsec/gcc-serial.bldconf
+index 6aed2703..e087310c 100644
+--- a/pkgs/apps/bodytrack/parsec/gcc-serial.bldconf
++++ b/pkgs/apps/bodytrack/parsec/gcc-serial.bldconf
+@@ -5,3 +5,19 @@ source ${PARSECDIR}/pkgs/apps/bodytrack/parsec/gcc.bldconf
+ # Override build environment
+ build_conf="--disable-threads"
+ 
++# Package dependencies
++build_deps="hooks"
++
++# Enable PARSEC hooks
++CFLAGS="${CFLAGS} -DENABLE_PARSEC_HOOKS -I${PARSECDIR}/pkgs/libs/hooks/inst/${PARSECPLAT}/include"
++CXXFLAGS="${CXXFLAGS} -DENABLE_PARSEC_HOOKS -I${PARSECDIR}/pkgs/libs/hooks/inst/${PARSECPLAT}/include"
++LDFLAGS="${LDFLAGS} -L${PARSECDIR}/pkgs/libs/hooks/inst/${PARSECPLAT}/lib"
++LIBS="${LIBS} -lhooks"
++
++# Add directory with hooks library to library search path
++if [ -z "${LD_LIBRARY_PATH}" ]; then
++  export LD_LIBRARY_PATH="${PARSECDIR}/pkgs/libs/hooks/inst/${PARSECPLAT}/lib"
++else
++  export LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:${PARSECDIR}/pkgs/libs/hooks/inst/${PARSECPLAT}/lib"
++fi
++
+diff --git a/pkgs/apps/bodytrack/src/TrackingBenchmark/main.cpp b/pkgs/apps/bodytrack/src/TrackingBenchmark/main.cpp
+index b25b18ae..b535176d 100644
+--- a/pkgs/apps/bodytrack/src/TrackingBenchmark/main.cpp
++++ b/pkgs/apps/bodytrack/src/TrackingBenchmark/main.cpp
+@@ -343,12 +343,18 @@ int mainSingleThread(string path, int cameras, int frames, int particles, int la
+ 	ofstream outputFileAvg((path + "poses.txt").c_str());
+ 
+ 	vector<float> estimate;																//expected pose from particle distribution
+-
++#ifdef ENABLE_PARSEC_HOOKS
++    initialize_barrier();
++#endif
+ #if defined(ENABLE_PARSEC_HOOKS)
+         __parsec_roi_begin();
+ #endif
+ 	for(int i = 0; i < frames; i++)														//process each set of frames
+-	{	cout << "Processing frame " << i << endl;
++	{
++#if defined(ENABLE_PARSEC_HOOKS)
++        call_barrier();
++#endif
++	        cout << "Processing frame " << i << endl;
+ 		if(!pf.Update((float)i))														//Run particle filter step
+ 		{	cout << "Error loading observation data" << endl;
+ 			return 0;
+diff --git a/pkgs/apps/facesim/parsec/gcc-serial.bldconf b/pkgs/apps/facesim/parsec/gcc-serial.bldconf
+index 102ef3f0..bf6b42f9 100644
+--- a/pkgs/apps/facesim/parsec/gcc-serial.bldconf
++++ b/pkgs/apps/facesim/parsec/gcc-serial.bldconf
+@@ -5,3 +5,19 @@ source ${PARSECDIR}/pkgs/apps/facesim/parsec/gcc.bldconf
+ # Environment to use for configure script and Makefile
+ build_env="version=serial PHYSBAM=${PARSECDIR}/pkgs/apps/facesim/obj/${PARSECPLAT} CXXFLAGS=\"${CXXFLAGS} -fexceptions\""
+ 
++# Package dependencies
++build_deps="hooks"
++
++# Enable PARSEC hooks
++CFLAGS="${CFLAGS} -DENABLE_PARSEC_HOOKS -I${PARSECDIR}/pkgs/libs/hooks/inst/${PARSECPLAT}/include"
++CXXFLAGS="${CXXFLAGS} -DENABLE_PARSEC_HOOKS -I${PARSECDIR}/pkgs/libs/hooks/inst/${PARSECPLAT}/include"
++LDFLAGS="${LDFLAGS} -L${PARSECDIR}/pkgs/libs/hooks/inst/${PARSECPLAT}/lib"
++LIBS="${LIBS} -lhooks"
++
++# Add directory with hooks library to library search path
++if [ -z "${LD_LIBRARY_PATH}" ]; then
++  export LD_LIBRARY_PATH="${PARSECDIR}/pkgs/libs/hooks/inst/${PARSECPLAT}/lib"
++else
++  export LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:${PARSECDIR}/pkgs/libs/hooks/inst/${PARSECPLAT}/lib"
++fi
++
+diff --git a/pkgs/apps/facesim/src/Public_Library/Solids_And_Fluids/SOLIDS_FLUIDS_DRIVER.cpp b/pkgs/apps/facesim/src/Public_Library/Solids_And_Fluids/SOLIDS_FLUIDS_DRIVER.cpp
+index 3179c4c7..8ae3f824 100644
+--- a/pkgs/apps/facesim/src/Public_Library/Solids_And_Fluids/SOLIDS_FLUIDS_DRIVER.cpp
++++ b/pkgs/apps/facesim/src/Public_Library/Solids_And_Fluids/SOLIDS_FLUIDS_DRIVER.cpp
+@@ -55,8 +55,14 @@ Initialize()
+ template<class T> void SOLIDS_FLUIDS_DRIVER<T>::
+ Simulate_To_Frame (const int frame_input)
+ {
++#ifdef ENABLE_PARSEC_HOOKS
++    initialize_barrier();
++#endif
+ 	while (current_frame < frame_input)
+ 	{
++#ifdef ENABLE_PARSEC_HOOKS
++		call_barrier();
++#endif
+ 		LOG::Push_Scope ("FRAME", "Frame %d", current_frame + 1);
+ 		Preprocess_Frame (current_frame + 1);
+ 		Advance_To_Target_Time (Time_At_Frame (current_frame + 1));
+diff --git a/pkgs/apps/ferret/parsec/gcc-serial.bldconf b/pkgs/apps/ferret/parsec/gcc-serial.bldconf
+index eb802379..d7a2f6b0 100644
+--- a/pkgs/apps/ferret/parsec/gcc-serial.bldconf
++++ b/pkgs/apps/ferret/parsec/gcc-serial.bldconf
+@@ -1,8 +1,25 @@
+ #!/bin/bash
+ 
+-source ${PARSECDIR}/pkgs/apps/ferret/parsec/gcc.bldconf
++#source ${PARSECDIR}/pkgs/apps/ferret/parsec/gcc.bldconf
+ 
+ # Environment to use for configure script and Makefile
+ # NOTE: $ferret_flags is set in gcc.bldconf
++#build_env="version=\"serial\" ${ferret_flags}"
++
++# Package dependencies
++build_deps="gsl libjpeg hooks"
++
++# Temporary variable with all flags
++ferret_flags="CFLAGS=\"-I${PARSECDIR}/pkgs/libs/gsl/inst/${PARSECPLAT}/include -I${PARSECDIR}/pkgs/libs/libjpeg/inst/${PARSECPLAT}/include -lhooks -DENABLE_PARSEC_HOOKS -I${PARSECDIR}/pkgs/libs/hooks/inst/${PARSECPLAT}/include ${CFLAGS}\" LDFLAGS=\"-L${PARSECDIR}/pkgs/libs/gsl/inst/${PARSECPLAT}/lib -L${PARSECDIR}/pkgs/libs/libjpeg/inst/${PARSECPLAT}/lib -L${PARSECDIR}/pkgs/libs/hooks/inst/${PARSECPLAT}/lib -lhooks ${LDFLAGS}\" LIBS=\" -lhooks ${LIBS}\" CXXFLAGS=\" -DENABLE_PARSEC_HOOKS -lhooks ${CXXFLAGS}\""
++
++# Environment to use for configure script and Makefile
+ build_env="version=\"serial\" ${ferret_flags}"
+ 
++# Whether the build system supports only in-place compilation.
++# If TRUE, then all sources will be copied to the build directory before we
++# start building the package. Required for older build systems which don't
++# support VPATH.
++build_inplace="TRUE"
++
++# Arguments to pass to the configure script, if it exists
++build_conf=""
+diff --git a/pkgs/apps/ferret/src/benchmark/ferret-serial.c b/pkgs/apps/ferret/src/benchmark/ferret-serial.c
+index 7263418c..42daed61 100644
+--- a/pkgs/apps/ferret/src/benchmark/ferret-serial.c
++++ b/pkgs/apps/ferret/src/benchmark/ferret-serial.c
+@@ -74,8 +74,14 @@ int dir_helper (char *dir, char *head)
+ 	int result = 0;
+ 	pd = opendir(dir);
+ 	if (pd == NULL) goto except;
++#ifdef ENABLE_PARSEC_HOOKS
++    initialize_barrier();
++#endif
+ 	for (;;)
+ 	{
++#ifdef ENABLE_PARSEC_HOOKS
++        call_barrier();
++#endif
+ 		ent = readdir(pd);
+ 		if (ent == NULL) break;
+ 		if (scan_dir(ent->d_name, head) != 0) return -1;
+diff --git a/pkgs/apps/fluidanimate/parsec/gcc-serial.bldconf b/pkgs/apps/fluidanimate/parsec/gcc-serial.bldconf
+index fff0758a..43fd00a3 100644
+--- a/pkgs/apps/fluidanimate/parsec/gcc-serial.bldconf
++++ b/pkgs/apps/fluidanimate/parsec/gcc-serial.bldconf
+@@ -5,3 +5,19 @@ source ${PARSECDIR}/pkgs/apps/fluidanimate/parsec/gcc.bldconf
+ # Override build environment
+ build_env="version=serial"
+ 
++# Package dependencies
++build_deps="hooks"
++
++# Enable PARSEC hooks
++CFLAGS="${CFLAGS} -DENABLE_PARSEC_HOOKS -I${PARSECDIR}/pkgs/libs/hooks/inst/${PARSECPLAT}/include"
++CXXFLAGS="${CXXFLAGS} -DENABLE_PARSEC_HOOKS -I${PARSECDIR}/pkgs/libs/hooks/inst/${PARSECPLAT}/include"
++LDFLAGS="${LDFLAGS} -L${PARSECDIR}/pkgs/libs/hooks/inst/${PARSECPLAT}/lib"
++LIBS="${LIBS} -lhooks"
++
++# Add directory with hooks library to library search path
++if [ -z "${LD_LIBRARY_PATH}" ]; then
++  export LD_LIBRARY_PATH="${PARSECDIR}/pkgs/libs/hooks/inst/${PARSECPLAT}/lib"
++else
++  export LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:${PARSECDIR}/pkgs/libs/hooks/inst/${PARSECPLAT}/lib"
++fi
++
+diff --git a/pkgs/apps/fluidanimate/src/serial.cpp b/pkgs/apps/fluidanimate/src/serial.cpp
+index f80ed9a5..313743fe 100644
+--- a/pkgs/apps/fluidanimate/src/serial.cpp
++++ b/pkgs/apps/fluidanimate/src/serial.cpp
+@@ -1034,11 +1034,19 @@ int main(int argc, char *argv[])
+ #ifndef ENABLE_VISUALIZATION
+ 
+ //core of benchmark program (the Region-of-Interest)
++#ifdef ENABLE_PARSEC_HOOKS
++    initialize_barrier();
++#endif
+ #ifdef ENABLE_PARSEC_HOOKS
+   __parsec_roi_begin();
+ #endif
+   for(int i = 0; i < framenum; ++i)
++#ifdef ENABLE_PARSEC_HOOKS
++  {
++    call_barrier();
++#endif
+     AdvanceFrame();
++  }
+ #ifdef ENABLE_PARSEC_HOOKS
+   __parsec_roi_end();
+ #endif
+diff --git a/pkgs/apps/freqmine/parsec/gcc-serial.bldconf b/pkgs/apps/freqmine/parsec/gcc-serial.bldconf
+index 254b0156..6f2c1254 100644
+--- a/pkgs/apps/freqmine/parsec/gcc-serial.bldconf
++++ b/pkgs/apps/freqmine/parsec/gcc-serial.bldconf
+@@ -5,3 +5,19 @@ source ${PARSECDIR}/pkgs/apps/freqmine/parsec/gcc.bldconf
+ # Override build environment
+ build_env=""
+ 
++# Package dependencies
++build_deps="hooks"
++
++# Enable PARSEC hooks
++CFLAGS="${CFLAGS} -DENABLE_PARSEC_HOOKS -I${PARSECDIR}/pkgs/libs/hooks/inst/${PARSECPLAT}/include"
++CXXFLAGS="${CXXFLAGS} -DENABLE_PARSEC_HOOKS -I${PARSECDIR}/pkgs/libs/hooks/inst/${PARSECPLAT}/include"
++LDFLAGS="${LDFLAGS} -L${PARSECDIR}/pkgs/libs/hooks/inst/${PARSECPLAT}/lib"
++LIBS="${LIBS} -lhooks"
++
++# Add directory with hooks library to library search path
++if [ -z "${LD_LIBRARY_PATH}" ]; then
++  export LD_LIBRARY_PATH="${PARSECDIR}/pkgs/libs/hooks/inst/${PARSECPLAT}/lib"
++else
++  export LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:${PARSECDIR}/pkgs/libs/hooks/inst/${PARSECPLAT}/lib"
++fi
++
+diff --git a/pkgs/apps/freqmine/src/fp_tree.cpp b/pkgs/apps/freqmine/src/fp_tree.cpp
+index 9997e048..5e51ca2a 100644
+--- a/pkgs/apps/freqmine/src/fp_tree.cpp
++++ b/pkgs/apps/freqmine/src/fp_tree.cpp
+@@ -42,6 +42,9 @@ THE POSSIBILITY OF SUCH DAMAGE.
+ #include "common.h"
+ #include "wtime.h"
+ 
++#ifdef ENABLE_PARSEC_HOOKS
++#include <hooks.h>
++#endif
+ #ifdef _OPENMP
+ #include <omp.h>
+ #else
+@@ -1293,7 +1296,9 @@ int FP_tree::FP_growth_first(FSout* fout)
+ 	double tstart, tend, temp_time;
+ 	int function_type;
+ 	int workingthread = omp_get_max_threads();
+-
++#ifdef ENABLE_PARSEC_HOOKS
++    initialize_barrier();
++#endif
+ 	wtime(&tstart);
+ 	fp_node_sub_buf = new memory(80, 131072, 2097152 * 4, 2);
+ 	if (itemno <= 0x100) {
+@@ -1342,7 +1347,11 @@ int FP_tree::FP_growth_first(FSout* fout)
+ 
+ 		#pragma omp parallel for schedule(dynamic,1)
+ 		for(sequence=upperbound - 1; sequence>=lowerbound; sequence--)
+-		{	int current, new_item_no, listlen;
++		{
++#ifdef ENABLE_PARSEC_HOOKS
++	        call_barrier();
++#endif
++		    int current, new_item_no, listlen;
+ 			int MC2=0;			
+ 			unsigned int MR2=0;	
+ 			char* MB2;		
+diff --git a/pkgs/apps/raytrace/parsec/gcc-serial.bldconf b/pkgs/apps/raytrace/parsec/gcc-serial.bldconf
+index 47c91892..4c04a128 100644
+--- a/pkgs/apps/raytrace/parsec/gcc-serial.bldconf
++++ b/pkgs/apps/raytrace/parsec/gcc-serial.bldconf
+@@ -7,3 +7,18 @@ source ${PARSECDIR}/pkgs/apps/raytrace/parsec/gcc.bldconf
+ # Overwrite default version string
+ build_env="${build_env} version=serial"
+ 
++# Package dependencies
++build_deps=" ${build_deps} hooks"
++
++# Enable PARSEC hooks
++CFLAGS="${CFLAGS} -DENABLE_PARSEC_HOOKS -I${PARSECDIR}/pkgs/libs/hooks/inst/${PARSECPLAT}/include"
++CXXFLAGS="${CXXFLAGS} -DENABLE_PARSEC_HOOKS -I${PARSECDIR}/pkgs/libs/hooks/inst/${PARSECPLAT}/include"
++LDFLAGS="${LDFLAGS} -L${PARSECDIR}/pkgs/libs/hooks/inst/${PARSECPLAT}/lib"
++LIBS="${LIBS} -lhooks"
++
++# Add directory with hooks library to library search path
++if [ -z "${LD_LIBRARY_PATH}" ]; then
++  export LD_LIBRARY_PATH="${PARSECDIR}/pkgs/libs/hooks/inst/${PARSECPLAT}/lib"
++else
++  export LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:${PARSECDIR}/pkgs/libs/hooks/inst/${PARSECPLAT}/lib"
++fi
+diff --git a/pkgs/apps/raytrace/src/MiniView/rtview.cxx b/pkgs/apps/raytrace/src/MiniView/rtview.cxx
+index 635fe5a7..af0b925c 100644
+--- a/pkgs/apps/raytrace/src/MiniView/rtview.cxx
++++ b/pkgs/apps/raytrace/src/MiniView/rtview.cxx
+@@ -472,6 +472,9 @@ int main(int argc, char* argv[])
+     glutKeyboardFunc(keyboardfunc);
+ 
+     /* start rendering */
++#ifdef ENABLE_PARSEC_HOOKS
++    initialize_barrier();
++#endif
+ #ifdef ENABLE_PARSEC_HOOKS
+     atexit(__parsec_roi_end);
+     __parsec_roi_begin();
+@@ -484,6 +487,9 @@ int main(int argc, char* argv[])
+ #endif
+     int frame = 0;
+     do {
++#ifdef ENABLE_PARSEC_HOOKS
++      call_barrier();
++#endif
+       render();
+       frame++;
+     } while(!(__builtin_expect(framesToRender > 0,0) && frame >= framesToRender));
+diff --git a/pkgs/apps/swaptions/parsec/gcc-serial.bldconf b/pkgs/apps/swaptions/parsec/gcc-serial.bldconf
+index 62d9798e..7ea4b5a0 100644
+--- a/pkgs/apps/swaptions/parsec/gcc-serial.bldconf
++++ b/pkgs/apps/swaptions/parsec/gcc-serial.bldconf
+@@ -5,3 +5,18 @@ source ${PARSECDIR}/pkgs/apps/swaptions/parsec/gcc.bldconf
+ # Override build environment
+ build_env="version=serial bench=1"
+ 
++# Package dependencies
++build_deps=" ${build_deps} hooks"
++
++# Enable PARSEC hooks
++CFLAGS="${CFLAGS} -DENABLE_PARSEC_HOOKS -I${PARSECDIR}/pkgs/libs/hooks/inst/${PARSECPLAT}/include"
++CXXFLAGS="${CXXFLAGS} -DENABLE_PARSEC_HOOKS -I${PARSECDIR}/pkgs/libs/hooks/inst/${PARSECPLAT}/include"
++LDFLAGS="${LDFLAGS} -L${PARSECDIR}/pkgs/libs/hooks/inst/${PARSECPLAT}/lib"
++LIBS="${LIBS} -lhooks"
++
++# Add directory with hooks library to library search path
++if [ -z "${LD_LIBRARY_PATH}" ]; then
++  export LD_LIBRARY_PATH="${PARSECDIR}/pkgs/libs/hooks/inst/${PARSECPLAT}/lib"
++else
++  export LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:${PARSECDIR}/pkgs/libs/hooks/inst/${PARSECPLAT}/lib"
++fi
+diff --git a/pkgs/apps/swaptions/src/HJM_Securities.cpp b/pkgs/apps/swaptions/src/HJM_Securities.cpp
+index c77552a1..eb796b66 100644
+--- a/pkgs/apps/swaptions/src/HJM_Securities.cpp
++++ b/pkgs/apps/swaptions/src/HJM_Securities.cpp
+@@ -101,6 +101,9 @@ void * worker(void *arg){
+     end = nSwaptions;
+ 
+   for(int i=beg; i < end; i++) {
++#ifdef ENABLE_PARSEC_HOOKS
++	   call_barrier();
++#endif
+      int iSuccess = HJM_Swaption_Blocking(pdSwaptionPrice,  swaptions[i].dStrike, 
+                                        swaptions[i].dCompounding, swaptions[i].dMaturity, 
+                                        swaptions[i].dTenor, swaptions[i].dPaymentInterval,
+@@ -146,6 +149,9 @@ int main(int argc, char *argv[])
+         printf("PARSEC Benchmark Suite\n");
+ 	fflush(NULL);
+ #endif //PARSEC_VERSION
++#ifdef ENABLE_PARSEC_HOOKS
++    initialize_barrier();
++#endif
+ #ifdef ENABLE_PARSEC_HOOKS
+ 	__parsec_bench_begin(__parsec_swaptions);
+ #endif
+diff --git a/pkgs/apps/x264/parsec/gcc-serial.bldconf b/pkgs/apps/x264/parsec/gcc-serial.bldconf
+index b122bdaa..a0ce21ed 100644
+--- a/pkgs/apps/x264/parsec/gcc-serial.bldconf
++++ b/pkgs/apps/x264/parsec/gcc-serial.bldconf
+@@ -2,6 +2,22 @@
+ 
+ source ${PARSECDIR}/pkgs/apps/x264/parsec/gcc.bldconf
+ 
++#Enable PARSEC hooks
++CFLAGS="${CFLAGS} -fPIC -DENABLE_PARSEC_HOOKS -I${PARSECDIR}/pkgs/libs/hooks/inst/${PARSECPLAT}/include"
++CXXFLAGS="${CXXFLAGS} -fPIC -DENABLE_PARSEC_HOOKS -I${PARSECDIR}/pkgs/libs/hooks/inst/${PARSECPLAT}/include"
++LDFLAGS="${LDFLAGS} -fPIC -L${PARSECDIR}/pkgs/libs/hooks/inst/${PARSECPLAT}/lib"
++LIBS="${LIBS} -lhooks"
++
++# Add directory with hooks library to library search path
++if [ -z "${LD_LIBRARY_PATH}" ]; then
++  export LD_LIBRARY_PATH="${PARSECDIR}/pkgs/libs/hooks/inst/${PARSECPLAT}/lib"
++else
++  export LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:${PARSECDIR}/pkgs/libs/hooks/inst/${PARSECPLAT}/lib"
++fi
++
+ # Override configuration
+-build_conf="--disable-pthread --extra-asflags=\"${ASFLAGS}\" --extra-cflags=\"${CFLAGS}\" --extra-ldflags=\"${LDFLAGS} ${LIBS}\""
++build_conf="--disable-pthread --enable-shared --extra-asflags=\"${ASFLAGS}\" --extra-cflags=\"${CFLAGS}\" --extra-ldflags=\"${LDFLAGS} ${LIBS}\""
++
++# Package dependencies
++build_deps="hooks ${build_deps}"
+ 
+diff --git a/pkgs/apps/x264/src/x264.c b/pkgs/apps/x264/src/x264.c
+index 5b740e0c..6bc6d5ca 100644
+--- a/pkgs/apps/x264/src/x264.c
++++ b/pkgs/apps/x264/src/x264.c
+@@ -848,6 +848,9 @@ static int  Encode( x264_param_t *param, cli_opt_t *opt )
+ 
+     i_start = x264_mdate();
+ 
++#ifdef ENABLE_PARSEC_HOOKS
++    initialize_barrier();
++#endif
+ #ifdef ENABLE_PARSEC_HOOKS
+     __parsec_roi_begin();
+ #endif
+@@ -855,6 +858,9 @@ static int  Encode( x264_param_t *param, cli_opt_t *opt )
+     /* Encode frames */
+     for( i_frame = 0, i_file = 0; b_ctrl_c == 0 && (i_frame < i_frame_total || i_frame_total == 0); )
+     {
++#ifdef ENABLE_PARSEC_HOOKS
++        call_barrier();
++#endif
+         if( p_read_frame( &pic, opt->hin, i_frame + opt->i_seek ) )
+             break;
+ 
+diff --git a/pkgs/kernels/canneal/parsec/gcc-serial.bldconf b/pkgs/kernels/canneal/parsec/gcc-serial.bldconf
+index ed346e46..b1dda20b 100644
+--- a/pkgs/kernels/canneal/parsec/gcc-serial.bldconf
++++ b/pkgs/kernels/canneal/parsec/gcc-serial.bldconf
+@@ -5,3 +5,19 @@ source ${PARSECDIR}/pkgs/kernels/canneal/parsec/gcc.bldconf
+ # Override build environment
+ build_env="version=serial"
+ 
++# Package dependencies
++build_deps="hooks"
++
++# Enable PARSEC hooks
++CFLAGS="${CFLAGS} -DENABLE_PARSEC_HOOKS -I${PARSECDIR}/pkgs/libs/hooks/inst/${PARSECPLAT}/include"
++CXXFLAGS="${CXXFLAGS} -DENABLE_PARSEC_HOOKS -I${PARSECDIR}/pkgs/libs/hooks/inst/${PARSECPLAT}/include"
++LDFLAGS="${LDFLAGS} -L${PARSECDIR}/pkgs/libs/hooks/inst/${PARSECPLAT}/lib"
++LIBS="${LIBS} -lhooks"
++
++# Add directory with hooks library to library search path
++if [ -z "${LD_LIBRARY_PATH}" ]; then
++  export LD_LIBRARY_PATH="${PARSECDIR}/pkgs/libs/hooks/inst/${PARSECPLAT}/lib"
++else
++  export LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:${PARSECDIR}/pkgs/libs/hooks/inst/${PARSECPLAT}/lib"
++fi
++
+diff --git a/pkgs/kernels/canneal/src/annealer_thread.cpp b/pkgs/kernels/canneal/src/annealer_thread.cpp
+index dfbb79c8..b90a6146 100644
+--- a/pkgs/kernels/canneal/src/annealer_thread.cpp
++++ b/pkgs/kernels/canneal/src/annealer_thread.cpp
+@@ -29,7 +29,9 @@
+ #ifdef ENABLE_THREADS
+ #include <pthread.h>
+ #endif
+-
++#ifdef ENABLE_PARSEC_HOOKS
++#include <hooks.h>
++#endif
+ #include <cassert>
+ #include "annealer_thread.h"
+ #include "location_t.h"
+@@ -60,7 +62,13 @@ void annealer_thread::Run()
+ 	netlist_elem* b = _netlist->get_random_element(&b_id, NO_MATCHING_ELEMENT, &rng);
+ 
+ 	int temp_steps_completed=0; 
++#ifdef ENABLE_PARSEC_HOOKS
++    initialize_barrier();
++#endif
+ 	while(keep_going(temp_steps_completed, accepted_good_moves, accepted_bad_moves)){
++#ifdef ENABLE_PARSEC_HOOKS
++        call_barrier();
++#endif
+ 		T = T / 1.5;
+ 		accepted_good_moves = 0;
+ 		accepted_bad_moves = 0;
+diff --git a/pkgs/kernels/dedup/parsec/gcc-serial.bldconf b/pkgs/kernels/dedup/parsec/gcc-serial.bldconf
+index 1e85dbd1..a52ccc7b 100644
+--- a/pkgs/kernels/dedup/parsec/gcc-serial.bldconf
++++ b/pkgs/kernels/dedup/parsec/gcc-serial.bldconf
+@@ -5,3 +5,19 @@ source ${PARSECDIR}/pkgs/kernels/dedup/parsec/gcc.bldconf
+ # Override build environment
+ build_env="version=serial"
+ 
++# Package dependencies
++build_deps="hooks"
++
++# Enable PARSEC hooks
++CFLAGS="${CFLAGS} -DENABLE_PARSEC_HOOKS -I${PARSECDIR}/pkgs/libs/hooks/inst/${PARSECPLAT}/include"
++CXXFLAGS="${CXXFLAGS} -DENABLE_PARSEC_HOOKS -I${PARSECDIR}/pkgs/libs/hooks/inst/${PARSECPLAT}/include"
++LDFLAGS="${LDFLAGS} -L${PARSECDIR}/pkgs/libs/hooks/inst/${PARSECPLAT}/lib"
++LIBS="${LIBS} -lhooks"
++
++# Add directory with hooks library to library search path
++if [ -z "${LD_LIBRARY_PATH}" ]; then
++  export LD_LIBRARY_PATH="${PARSECDIR}/pkgs/libs/hooks/inst/${PARSECPLAT}/lib"
++else
++  export LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:${PARSECDIR}/pkgs/libs/hooks/inst/${PARSECPLAT}/lib"
++fi
++
+diff --git a/pkgs/kernels/dedup/src/encoder.c b/pkgs/kernels/dedup/src/encoder.c
+index 6911a700..36f70758 100644
+--- a/pkgs/kernels/dedup/src/encoder.c
++++ b/pkgs/kernels/dedup/src/encoder.c
+@@ -771,9 +771,14 @@ void *SerialIntegratedPipeline(void * targs) {
+     printf("WARNING: I/O buffer size is very small. Performance degraded.\n");
+     fflush(NULL);
+   }
+-
++#ifdef ENABLE_PARSEC_HOOKS
++    initialize_barrier();
++#endif
+   //read from input file / buffer
+   while (1) {
++#ifdef ENABLE_PARSEC_HOOKS
++    call_barrier();
++#endif
+     size_t bytes_left; //amount of data left over in last_mbuffer from previous iteration
+ 
+     //Check how much data left over from previous iteration resp. create an initial chunk
+diff --git a/pkgs/kernels/streamcluster/parsec/gcc-serial.bldconf b/pkgs/kernels/streamcluster/parsec/gcc-serial.bldconf
+index d60d645c..f9dc2508 100644
+--- a/pkgs/kernels/streamcluster/parsec/gcc-serial.bldconf
++++ b/pkgs/kernels/streamcluster/parsec/gcc-serial.bldconf
+@@ -5,3 +5,19 @@ source ${PARSECDIR}/pkgs/kernels/streamcluster/parsec/gcc.bldconf
+ # Override build environment
+ build_env="version=serial"
+ 
++# Package dependencies
++build_deps="hooks"
++
++# Enable PARSEC hooks
++CFLAGS="${CFLAGS} -DENABLE_PARSEC_HOOKS -I${PARSECDIR}/pkgs/libs/hooks/inst/${PARSECPLAT}/include"
++CXXFLAGS="${CXXFLAGS} -DENABLE_PARSEC_HOOKS -I${PARSECDIR}/pkgs/libs/hooks/inst/${PARSECPLAT}/include"
++LDFLAGS="${LDFLAGS} -L${PARSECDIR}/pkgs/libs/hooks/inst/${PARSECPLAT}/lib"
++LIBS="${LIBS} -lhooks"
++
++# Add directory with hooks library to library search path
++if [ -z "${LD_LIBRARY_PATH}" ]; then
++  export LD_LIBRARY_PATH="${PARSECDIR}/pkgs/libs/hooks/inst/${PARSECPLAT}/lib"
++else
++  export LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:${PARSECDIR}/pkgs/libs/hooks/inst/${PARSECPLAT}/lib"
++fi
++
+diff --git a/pkgs/kernels/streamcluster/src/streamcluster.cpp b/pkgs/kernels/streamcluster/src/streamcluster.cpp
+index 29ff344e..cd646e45 100644
+--- a/pkgs/kernels/streamcluster/src/streamcluster.cpp
++++ b/pkgs/kernels/streamcluster/src/streamcluster.cpp
+@@ -1884,7 +1884,13 @@ void streamCluster( PStream* stream,
+ 
+   long IDoffset = 0;
+   long kfinal;
++#ifdef ENABLE_PARSEC_HOOKS
++  initialize_barrier();
++#endif
+   while(1) {
++#ifdef ENABLE_PARSEC_HOOKS
++    call_barrier();
++#endif
+ 
+     size_t numRead  = stream->read(block, dim, chunksize ); 
+     fprintf(stderr,"read %d points\n",numRead);
+diff --git a/pkgs/libs/hooks/src/Makefile.shared b/pkgs/libs/hooks/src/Makefile.shared
+index 8c66c492..3713c9bd 100644
+--- a/pkgs/libs/hooks/src/Makefile.shared
++++ b/pkgs/libs/hooks/src/Makefile.shared
+@@ -14,7 +14,7 @@ OBJS=hooks.lo
+ 
+ 
+ all: $(OBJS)
+-	$(LIBTOOL) --mode=link $(CC) $(CFLAGS) $(OBJS) -o $(TARGET) -rpath $(PREFIX)/lib
++	$(LIBTOOL) --mode=link $(CC) $(CFLAGS) $(OBJS) -o $(TARGET) -rpath $(PREFIX)/lib -lrt -pthread
+ 
+ %.lo : %.c
+ 	$(LIBTOOL) --mode=compile $(CC) $(CFLAGS) -Wall -D_GNU_SOURCE -D_XOPEN_SOURCE=600 -c $<
+diff --git a/pkgs/libs/hooks/src/hooks.c b/pkgs/libs/hooks/src/hooks.c
+index 96584258..c7b45134 100644
+--- a/pkgs/libs/hooks/src/hooks.c
++++ b/pkgs/libs/hooks/src/hooks.c
+@@ -45,6 +45,14 @@
+ #include <stdio.h>
+ #include <assert.h>
+ 
++//BENCHCAST
++#include <fcntl.h>
++#include <stdio.h>
++#include <stdlib.h>
++#include <pthread.h>
++#include <sys/mman.h>
++#include <stdbool.h>
++
+ #if ENABLE_TIMING
+ #include <sys/time.h>
+ /** \brief Time at beginning of execution of Region-of-Interest.
+@@ -91,6 +99,14 @@ static int num_bench_ends = 0;
+  */
+ static enum __parsec_benchmark bench;
+ 
++//BENCHCAST
++typedef struct bench_barrier {
++   pthread_barrier_t barrier;
++   bool doWait;;
++} bench_barrier_t;
++
++static bench_barrier_t* my_barrier;
++
+ /* NOTE: Please look at hooks.h to see how these functions are used */
+ 
+ void __parsec_bench_begin(enum __parsec_benchmark __bench) {
+@@ -225,3 +241,28 @@ void __parsec_roi_end() {
+   fflush(NULL);
+ }
+ 
++int initialize_barrier()
++{
++    char    shm_name[] = "tmp_pthread_barrierattr_getpshared";
++    int     shm_fd;
++    shm_fd = shm_open(shm_name, O_RDWR, 0644);
++    if(shm_fd == -1)
++    {
++      fprintf(stderr,"[E] Error at shm_open()");
++      exit(-2);
++    }
++    my_barrier = (bench_barrier_t*)mmap(NULL, sizeof(bench_barrier_t), PROT_READ|PROT_WRITE,
++      MAP_SHARED, shm_fd, (off_t)0);
++    if(my_barrier == MAP_FAILED)
++    {
++      fprintf(stderr,"[E] child: Error at first mmap()");
++      exit(-1);
++    }
++    return 0;
++}
++
++void call_barrier()
++{
++  if(my_barrier->doWait)
++  {  pthread_barrier_wait(&my_barrier->barrier);}
++}
+diff --git a/pkgs/libs/hooks/src/include/hooks.h b/pkgs/libs/hooks/src/include/hooks.h
+index 12939554..591db2a0 100644
+--- a/pkgs/libs/hooks/src/include/hooks.h
++++ b/pkgs/libs/hooks/src/include/hooks.h
+@@ -156,6 +156,10 @@ void __parsec_roi_begin();
+  */
+ void __parsec_roi_end();
+ 
++int initialize_barrier();
++
++void call_barrier();
++
+ #ifdef __cplusplus
+ } // extern "C"
+ #endif
