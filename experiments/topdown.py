@@ -178,16 +178,24 @@ if args.reffile:
         new_row = {'Benchmark': b}
         BENCHCASTS_DF = BENCHCASTS_DF.append(
             pandas.Series(new_row), ignore_index=True)
+        skip = 0
         for event in event_list:
             value = getPerfHybridValues(outputfile, num_cpus, event)
-            BENCHCASTS_DF.loc[BENCHCASTS_DF.index[-1],
-                              event] = '['+','.join(map(str, value))+']'
-            BENCHCASTS_DF.loc[BENCHCASTS_DF.index[-1],
-                              'Avg_'+event] = np.mean(value)
-            BENCHCASTS_DF.loc[BENCHCASTS_DF.index[-1],
-                              'Total_'+event] = np.sum(value)
-        count = count+1
-        BENCHCASTS_DF.to_csv(args.filename)
+            if 0.0 in value:
+                printColor("Application do not run during execution", "red")
+                skip = 1
+                break
+        if skip == 0:
+            for event in event_list:
+                value = getPerfHybridValues(outputfile, num_cpus, event)
+                BENCHCASTS_DF.loc[BENCHCASTS_DF.index[-1],
+                                  event] = '['+','.join(map(str, value))+']'
+                BENCHCASTS_DF.loc[BENCHCASTS_DF.index[-1],
+                                  'Avg_'+event] = np.mean(value)
+                BENCHCASTS_DF.loc[BENCHCASTS_DF.index[-1],
+                                  'Total_'+event] = np.sum(value)
+            count = count+1
+            BENCHCASTS_DF.to_csv(args.filename)
 else:
     while count < args.numtests:
         bench = []
@@ -226,15 +234,23 @@ else:
         new_row = {'Benchmark': sort_name}
         BENCHCASTS_DF = BENCHCASTS_DF.append(
             pandas.Series(new_row), ignore_index=True)
+        skip = 0
         for event in event_list:
             value = getPerfHybridValues(outputfile, num_cpus, event)
-            BENCHCASTS_DF.loc[BENCHCASTS_DF.index[-1],
-                              event] = '['+','.join(map(str, value))+']'
-            BENCHCASTS_DF.loc[BENCHCASTS_DF.index[-1],
-                              'Avg_'+event] = np.mean(value)
-            BENCHCASTS_DF.loc[BENCHCASTS_DF.index[-1],
-                              'Total_'+event] = np.sum(value)
-        count = count+1
-        BENCHCASTS_DF.to_csv(args.filename)
+            if 0.0 in value:
+                printColor("Application do not run during execution", "red")
+                skip = 1
+                break
+        if skip == 0:
+            for event in event_list:
+                value = getPerfHybridValues(outputfile, num_cpus, event)
+                BENCHCASTS_DF.loc[BENCHCASTS_DF.index[-1],
+                                  event] = '['+','.join(map(str, value))+']'
+                BENCHCASTS_DF.loc[BENCHCASTS_DF.index[-1],
+                                  'Avg_'+event] = np.mean(value)
+                BENCHCASTS_DF.loc[BENCHCASTS_DF.index[-1],
+                                  'Total_'+event] = np.sum(value)
+            count = count+1
+            BENCHCASTS_DF.to_csv(args.filename)
 
 printColor("THE END!", "green")
