@@ -204,7 +204,8 @@ There are some files you can check to see how to add a new benchmark on your own
 ## References
 
 If you use this tool in your research, please cite the following paper:
-*P. Prieto, P. Abad, J.A. Herrero, J.A. Gregorio, V. Puente, "SPECcast: A Methodology for Fast Performance Evaluation with SPEC CPU 2017 Multiprogrammed Workloads" in ICPP 2020 - 49th International Conference on Parallel Processing, 2020*
+
+*P. Prieto, P. Abad, J. A. Gregorio and V. Puente, "Fast, Accurate Processor Evaluation Through Heterogeneous, Sample-Based Benchmarking," in IEEE Transactions on Parallel and Distributed Systems, vol. 32, no. 12, pp. 2983-2995, 1 Dec. 2021, doi: 10.1109/TPDS.2021.3080702.*
 
 ## Disclaimer
 
