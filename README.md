@@ -6,6 +6,7 @@ BenchCast is a performance evaluation tool that uses profiling ([PAPI](https://i
 
 * SPECcast paper at ICPP'20 [Paper](https://doi.org/10.1145/3404397.3404424)
 * SPECcast video presentation [Video](https://www.youtube.com/watch?v=h5hMzUvMAWY)
+* BenchCast paper at TPDS [Paper](https://doi.org/10.1109/TPDS.2021.3080702)
   
 ## SPEC CPU 2017 Integration
 
