@@ -16505,10 +16505,6 @@ index 00000000..81ce1f46
 +/ZtjnN9Gf0nvMKAjJw+QLbro/dSDjaj22Osfs4z/tLMmQaNqzXty2HgFFGoyXw==
 +exehash=0b01ae90611ae95e3d63cb6961b43ad09f732e5472a83916c30242ca7cfe69d9
 +
-diff --git a/cpu2017-1_0_2.iso b/cpu2017-1_0_2.iso
-deleted file mode 100644
-index 305909af..00000000
-Binary files a/cpu2017-1_0_2.iso and /dev/null differ
 diff --git a/install.sh b/install.sh
 index 86170a73..8c2e2ff4 100755
 --- a/install.sh
