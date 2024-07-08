@@ -1,6 +1,7 @@
 from SPEC_CMDS import abreviate_spec_name, launch_cmd_rate
 from PARSEC_CMDS import parsec_cmd
 from BENCH_CONF import PATHS
+import platform
 
 def create_bench(bench, app, conf=""):
     if bench == "SPEC":
@@ -32,7 +33,17 @@ class SPEC(Bench):
         self.app = app
         print("app %s" % self.app)
     def getExecPath(self):
-        return "%s/benchspec/CPU/%s/run/run_base_refrate_%s-m64.0000/" % (self.PATH, abreviate_spec_name[self.app], self.config)
+        mach=platform.machine()
+        if(mach == "aarch64"):
+            #ARM
+            execpath="%s/benchspec/CPU/%s/run/run_base_refrate_%s-64.0000/" % (self.PATH, abreviate_spec_name[self.app], self.config)
+        elif(mach == "x86_64"):
+            #X86
+            execpath="%s/benchspec/CPU/%s/run/run_base_refrate_%s-m64.0000/" % (self.PATH, abreviate_spec_name[self.app], self.config)
+        else:
+            print("ERROR: Not supported architecture")
+            exit -1
+        return execpath
     def getNameApp(self, app_name):
         if ("gcc" in app_name):
             return "cpu"+app_name
@@ -43,7 +54,14 @@ class SPEC(Bench):
         else:
             return app_name
     def getExecCmd(self, cmd):
-        return "./%s_r_base.%s-m64 %s" % (self.getNameApp(self.app), self.config, launch_cmd_rate[abreviate_spec_name[self.app]][int(cmd)])
+        mach=platform.machine()
+        if(mach == "aarch64"):
+            #ARM
+            exec_cmd="./%s_r_base.%s-64 %s" % (self.getNameApp(self.app), self.config, launch_cmd_rate[abreviate_spec_name[self.app]][int(cmd)])
+        elif(mach == "x86_64"):
+            #X86
+            exec_cmd="./%s_r_base.%s-m64 %s" % (self.getNameApp(self.app), self.config, launch_cmd_rate[abreviate_spec_name[self.app]][int(cmd)])
+        return exec_cmd
 
 class NPB(Bench):
     def __init__(self, app):
