@@ -1,0 +1,51 @@
+diff --git a/Makefile b/Makefile
+index bb6e2f96..1d4eca43 100644
+--- a/Makefile
++++ b/Makefile
+@@ -68,6 +68,9 @@ LEGACY_TARGETS = main quantize quantize-stats perplexity imatrix embedding vdot
+ 	simple batched batched-bench save-load-state server gguf gguf-split eval-callback llama-bench libllava.a llava-cli baby-llama \
+ 	retrieval speculative infill tokenize benchmark-matmult parallel finetune export-lora lookahead lookup passkey gritlm
+ 
++CFLAGS+=-DBENCHCAST
++CXXFLAGS+=-DBENCHCAST
++OBJ_GGML    += ggml/src/barrier_cast.o
+ # Deprecation aliases
+ ifdef LLAMA_CUBLAS
+ $(error LLAMA_CUBLAS is removed. Use GGML_CUDA instead.)
+diff --git a/ggml/src/ggml.c b/ggml/src/ggml.c
+index bc91ac3a..e986670b 100644
+--- a/ggml/src/ggml.c
++++ b/ggml/src/ggml.c
+@@ -45,6 +45,10 @@
+ #include "sgemm.h"
+ #endif
+ 
++#ifdef BENCHCAST
++#include "barrier_cast.h"
++#endif
++
+ #if defined(_MSC_VER)
+ // disable "possible loss of data" to avoid hundreds of casts
+ // we should just be careful :)
+@@ -3332,6 +3336,10 @@ struct ggml_context * ggml_init(struct ggml_init_params params) {
+     static bool is_first_call = true;
+ 
+     if (is_first_call) {
++#ifdef BENCHCAST
++        fprintf(stderr, "WARNING! Using BENCHCAST\n");
++        initialize_barrier();
++#endif
+         // initialize time system (required on Windows)
+         ggml_time_init();
+ 
+@@ -18685,6 +18693,10 @@ enum ggml_status ggml_graph_compute(struct ggml_cgraph * cgraph, struct ggml_cpl
+     GGML_ASSERT(cplan->n_threads > 0);
+     GGML_ASSERT(cplan->work_size == 0 || cplan->work_data != NULL);
+ 
++    //fprintf(stderr, "COMPUTE FORDWARD\n");
++#ifdef BENCHCAST
++    call_barrier();
++#endif
+     int n_threads = cplan->n_threads;
+ 
+     struct ggml_compute_state_shared state_shared = {
