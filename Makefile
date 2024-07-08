@@ -9,7 +9,13 @@ OBJ += m5_mmap.o m5op_addr.o
 endif
 # Final run:
 CFLAGS += -O2
-LDFLAGS += -pthread -lrt /usr/local/lib/libpapi.a
+LDFLAGS += -pthread -lrt
+
+ifdef PAPI
+CFLAGS += -DPAPI
+LDFLAGS += -lpapi
+#LDFLAGS += /usr/local/lib/libpapi.a
+endif
 
 OBJOPT        ?= -c -o $@
 # or, if you want debugging:

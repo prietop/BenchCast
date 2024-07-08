@@ -9,7 +9,9 @@ Author: Pablo Prieto Torralbo <prietop@unican.es>
 #include <stdlib.h>
 #include <errno.h>
 #include <stdbool.h>
+#ifdef PAPI
 #include <papi.h>
+#endif
 #include <sched.h> // linux
 #include <string.h>
 #include <unistd.h>
@@ -174,15 +176,18 @@ static struct option long_options[] =
         {"help", no_argument, &print_help, 1},
         {0, 0, 0, 0}};
 
+#ifdef PAPI
 void handle_error(int retval)
 {
       if (retval > 0)
       {
-            printf("PAPI error %d: %s\n", retval, PAPI_strerror(retval));
+            fprintf(stderr,"PAPI error %d: %s\n", retval, PAPI_strerror(retval));
       }
       kill(0, SIGKILL);
       exit(retval);
 }
+#endif
+
 
 void get_options(int argc, char **argv, int *waiting, int *gem5_work_op, int *use_papi, char (*app)[MAX_APP_LENGTH],
                  char (*sub_app)[MAX_APP_LENGTH], char *config, int *num_processors, int *num_apps, int *num_loops, 
@@ -237,9 +242,14 @@ void get_options(int argc, char **argv, int *waiting, int *gem5_work_op, int *us
                   break;
 
             case 's':
+#ifdef PAPI
                   *use_papi = 1;
                   *sleep_sec = atoi(optarg);
                   printf("Using PAPI for %d seconds\n", *sleep_sec);
+#else
+                  fprintf(stderr,"Using PAPI but compilation does not allow it (use -DPAPI)\n");
+                  exit(-1);
+#endif
                   break;
 
             case 'w':
@@ -298,6 +308,7 @@ void get_options(int argc, char **argv, int *waiting, int *gem5_work_op, int *us
 
             case 'v':
                   *use_csv = 1;
+#ifdef PAPI
                   if (*use_papi == 0)
                   {
                         *use_papi = 1;
@@ -305,9 +316,14 @@ void get_options(int argc, char **argv, int *waiting, int *gem5_work_op, int *us
                   }
                   strcpy(csv_filename, optarg);
                   printf("CSV file name: %s\n", csv_filename);
+#else
+                  fprintf(stderr, "Using PAPI but PAPI environment variable not defined (compile with -DPAPI)\n");
+                  exit(-1);
+#endif
                   break;
 
             case 'r':
+#ifdef PAPI
                   if (*use_csv == 0)
                   {
                         fprintf(stderr, "WARNING! -r option without CSV file (-v option)\n");
@@ -321,6 +337,10 @@ void get_options(int argc, char **argv, int *waiting, int *gem5_work_op, int *us
                   }
                   *num_papi_loops = atoi(optarg);
                   printf("Periodic PAPI measure: %d times", *num_papi_loops);
+#else
+                  fprintf(stderr, "Using PAPI but PAPI environment variable not defined (compile with -DPAPI)\n");
+                  exit(-1);
+#endif
                   break;
 
             case '?':
@@ -392,6 +412,7 @@ void get_options(int argc, char **argv, int *waiting, int *gem5_work_op, int *us
       }
 }
 
+#ifdef PAPI
 void create_event_set(int *EventSet, int cpu_num, char (*event_list)[MAX_EVENT_LENGTH],
                       int *num_events, char *events_file)
 {
@@ -681,3 +702,4 @@ void do_papi(int num_papi_loops, int num_secs, pid_t *pids, int num_procs, char 
             }
       }
 }
+#endif

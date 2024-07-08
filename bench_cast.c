@@ -288,10 +288,12 @@ int main (int argc, char **argv)
             numWaits++;
             if(numWaits>=num_loops)
             { my_barrier->doWait=false; }
+#ifdef PAPI
             if(numWaits == 1 && use_papi == 1)
             {
                 init_papi(pid, num_processors, EventSet, event_list, init_proc, &num_events, events_file);
             }
+#endif
         }
     }
     else
@@ -360,7 +362,7 @@ int main (int argc, char **argv)
         printf("process %d: get along with the barrier\n"
         , getpid());
     }
-
+#ifdef PAPI
     if(use_papi == 1)
     {
         //call PAPI (defined in .h)
@@ -408,7 +410,9 @@ int main (int argc, char **argv)
         fflush(stdout);
         fflush(stderr);
         return 0;
-    } else if(waiting==1)
+    } else 
+#endif
+    if(waiting==1)
     {
         /* parent */
         for(proc=init_proc;proc<proc_limit;proc++)
