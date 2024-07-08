@@ -9,6 +9,8 @@ def create_bench(bench, app, conf=""):
         return PARSEC(app)
     elif bench == "NPB":
         return NPB(app)
+    elif bench == "llama":
+        return LLAMA(app)
     else:
         return Bench(app)
 
@@ -68,4 +70,17 @@ class PARSEC(Bench):
             return app_name
     def getExecCmd(self, cmd):
         return "./%s %s" % (self.getNameApp(self.app), parsec_cmd[self.app][int(cmd)])
+
+class LLAMA(Bench):
+    def __init__(self, app):
+        Bench.__init__(self, app)
+        self.PATH = PATHS["LLAMA"]
+    def getExecPath(self):
+        return self.PATH
+    def getNameApp(self):
+        return "llama-cli"
+    def getExecCmd(self, cmd):
+        #number of threads in cmd
+        return "./%s -m %s -t %s -n 4096 -p \"hola\"" % (self.getNameApp(), self.app, cmd)
+
 

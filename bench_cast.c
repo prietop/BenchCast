@@ -18,7 +18,7 @@
 //   --------------------------------------------------------------------
 //
 //   BENCHcast is free software; you can redistribute it and/or
-//   modify it under the terms of version 2 of the GNU General Public
+//   modify it under the terms of version 3 of the GNU General Public
 //   License as published by the Free Software Foundation.
 //
 //   BENCHcast is distributed in the hope that it will be useful,
@@ -72,6 +72,9 @@ int main (int argc, char **argv)
     int num_loops=1;
     int num_papi_loops=1;
     int num_secs=60;
+    int num_threads=0;
+    char multi_app[MAX_APP_LENGTH];
+    char multi_app_bench[MAX_APP_LENGTH];
     char *csv_filename;
     int init_proc=0;
     int EventSet[max_num_processors];
@@ -83,7 +86,8 @@ int main (int argc, char **argv)
 
     get_options(argc, argv, &waiting, &gem5_work_op, &use_papi, app, sub_app, config, 
                 &num_processors, &num_apps, &num_loops, &use_csv, &num_secs, 
-                &num_papi_loops, csv_filename, &init_proc, events_file);
+                &num_papi_loops, csv_filename, &init_proc, events_file, 
+                &num_threads, multi_app, multi_app_bench);
 
     if((num_processors+init_proc)>max_num_processors)
     {
@@ -205,8 +209,48 @@ int main (int argc, char **argv)
 
     /* Fork a child process */
     proc=init_proc;
+    int proc_limit=num_processors+init_proc;
+    if(num_threads > 0)
+    {
+        printf("Entering multi-threaded execution\n");
+        //proc_limit--; //num_processors include the multi-threaded app for the barrier.
+        pid[proc] = fork();
+        if(pid[proc] < 0)
+        {
+            perror("[E] Error at multi-threaded fork()");
+            return -3;
+        }
+        else if(pid[proc] == 0)
+        {
+            //child multi-threaded app
+            bind_multi(proc, proc+num_threads, getpid());
+            fprintf(stderr, "Multi-thread %d executing %s %s\n", getpid(), multi_app, multi_app_bench);
+            char thread_char[10];
+            sprintf(thread_char, "%d", num_threads);
+            char *prog[] = { "./launch_bench.py", "--bench", multi_app, "--app", multi_app_bench, "--cmd", thread_char, "--conf", config, NULL };    
+            fprintf(stderr, "Multi-thread Executing: ");
+            int i=0;
+            while(prog[i]!=NULL)
+            {
+                fprintf(stderr, " %s", prog[i]);
+                i++;
+            }
+            fprintf(stderr, "\n");
+            rc = execv("./launch_bench.py", prog);
+            if(rc<0)
+            {
+                fprintf(stderr,"Error execv in multi-threaded app\n");
+                exit(rc);
+            }
+        }else
+        {
+            //parent (bench_cast)
+            fprintf(stderr,"parent pid : %d, multi-threaded child pid : %d\n", (int)getpid(), pid[proc]);
+            proc++;
+        }
+    }
     int app_index=0;
-    while(proc<num_processors+init_proc)
+    while(proc<proc_limit)
     {
         pid[proc] = fork();
         if(pid[proc] < 0)
@@ -253,7 +297,7 @@ int main (int argc, char **argv)
     else
     {
         //Child: execute command
-        fprintf(stderr, "%d executing %s %d\n", getpid(), my_bench, my_sub_bench);
+        fprintf(stderr, "%d executing %s %s\n", getpid(), my_bench, my_sub_bench);
         char my_cmd[MAX_APP_LENGTH];
         char my_app[MAX_APP_LENGTH];
         char* token;
@@ -283,7 +327,7 @@ int main (int argc, char **argv)
         }
     }
 
-    //No child should below this point
+    //No child should execute below this point
     if(pid[proc]==0)
     {
         fprintf(stderr,"ERROR Wild Child Found\n");
@@ -367,7 +411,7 @@ int main (int argc, char **argv)
     } else if(waiting==1)
     {
         /* parent */
-        for(proc=init_proc;proc<num_processors+init_proc;proc++)
+        for(proc=init_proc;proc<proc_limit;proc++)
         {
             child_pid = wait(&status);
             if( child_pid == -1)

@@ -35,6 +35,7 @@ static void usage(char *argv0)
 
       fprintf(stderr, "Usage: %s [-b] [-w] [-p number] [-n number] [-l number] [-m N]"
                       "[-c config_name] [-v csv_filename] [-s seconds] [-r number] [-e events_file]"
+                      "[-t num_threads] [-a multithreaded_app]"
                       "--<BENCH> [app1.cmd] [--<BENCH2> [app2.cmd] --<BENCH3> [app3.cmd] ...]\n",
               argv0);
       fprintf(stderr, "   BENCH.app is the program/s you want to cast. Applications usually"
@@ -47,15 +48,17 @@ static void usage(char *argv0)
                       "programs. The default is to wait for them to finish.\n",
               argv0);
       fprintf(stderr, "   -p is the number of processors you want to use from the "
-                      "system (default value: the number of available processors in the "
-                      "system, i.e: %d)\n",
-              max_num_processors);
+                      "system for single threaded applications (default value: the number of available" 
+                      "processors in the system, i.e: %d)\n", max_num_processors);
       fprintf(stderr, "   -w should be used with GEM5, and executes a "
                       "m5_work_begin_op\n");
       fprintf(stderr, "   -s use papi library to analyze performance counters during "
                       "N seconds\n");
       fprintf(stderr, "   -c SPEC config name\n");
       fprintf(stderr, "   -e event list file name\n");
+      fprintf(stderr, "   -t indicates you want to run a multi-threaded app and the value" 
+                      "   indicates the number of threads to use for that app\n");
+      fprintf(stderr, "   -a is the name of the multi-threaded application to run\n");
       fprintf(stderr, "   -v print papi results in a csv file (PAPI IS ASSUMED)\n");
       fprintf(stderr, "   -r repeat papi measures N times (PAPI IS ASSUMED, and csv output)\n");
       fprintf(stderr, "   -n Number of different programs to run. It defaults to the"
@@ -115,12 +118,59 @@ static void bind_pid(int cpu_num, pid_t PID_NUM)
       }
 }
 
+static void bind_multi(int cpu_init, int cpu_end, pid_t PID_NUM)
+{
+      // PID_NUM should be 0 for the current process, or whatever if the parent does
+      // everything
+      cpu_set_t mask;
+      CPU_ZERO(&mask);
+      //CPU_SET(2, &mask);
+      unsigned int len = sizeof(mask);
+      if (cpu_end < max_num_processors)
+      {
+            for(int cpu_num=cpu_init; cpu_num<cpu_end; cpu_num++)
+            {
+                  CPU_SET(cpu_num, &mask);
+            }
+            int rc = sched_setaffinity(PID_NUM, len, &mask);
+            if (rc < 0)
+            {
+                  fprintf(stderr, "[E] Trying %d in processor %d to %d", (int)PID_NUM, cpu_init, cpu_end);
+                  //fprintf(stderr, "\n [E] max number of procs %d", CPU_SETSIZE);
+                  if (errno == ESRCH)
+                  {
+                        fprintf(stderr, "No process or thread with the given ID found.");
+                  }
+                  if (errno == EFAULT)
+                  {
+                        fprintf(stderr, "The pointer cpuset does not point to a valid object.");
+                  }
+                  if (errno == EINVAL)
+                  {
+                        fprintf(stderr, "The bitset is not valid. This might mean that "
+                                    "the affinity set might not leave a processor for the process "
+                                    "or thread to run on.");
+                  }
+                  perror("[E] sched_setaffinity error");
+            }
+            else
+            {
+                  printf("[I] %d bound to processors %d to %d\n", (int)PID_NUM, cpu_init, cpu_end-1);
+            }
+      }
+      else
+      {
+            fprintf(stderr, "[W] Cannot bind more than %i pids\n", max_num_processors);
+      }
+}
+
 static struct option long_options[] =
     {
         /* These options set a flag. */
         {"SPEC", required_argument, 0, 1},
         {"NPB", required_argument, 0, 1},
         {"PARSEC", required_argument, 0, 1},
+        {"llama", required_argument, 0, 1},
         {"help", no_argument, &print_help, 1},
         {0, 0, 0, 0}};
 
@@ -135,16 +185,18 @@ void handle_error(int retval)
 }
 
 void get_options(int argc, char **argv, int *waiting, int *gem5_work_op, int *use_papi, char (*app)[MAX_APP_LENGTH],
-                 char (*sub_app)[MAX_APP_LENGTH], char *config, int *num_processors, int *num_apps, int *num_loops, int *use_csv, int *sleep_sec,
-                 int *num_papi_loops, char *csv_filename, int *initcore, char *events_file)
+                 char (*sub_app)[MAX_APP_LENGTH], char *config, int *num_processors, int *num_apps, int *num_loops, 
+                 int *use_csv, int *sleep_sec, int *num_papi_loops, char *csv_filename, int *initcore, 
+                 char *events_file, int *num_threads, char *multi_app, char* multi_app_bench)
 {
       int option_index = 0;
       int app_index = 0;
       int c = 0;
+      int multi_app_c=0;
 
       while (c >= 0)
       {
-            c = getopt_long(argc, argv, "wbp:n:l:c:v:s:r:m:e:", long_options, &option_index);
+            c = getopt_long(argc, argv, "wbp:n:l:c:v:s:r:m:e:t:a:", long_options, &option_index);
 
             if (c == -1)
                   break;
@@ -164,17 +216,24 @@ void get_options(int argc, char **argv, int *waiting, int *gem5_work_op, int *us
             case 1:
                   //long option with required arguments
                   printf("App: %s\n", long_options[option_index].name);
-                  strcpy(app[app_index], long_options[option_index].name);
-                  strcpy(sub_app[app_index], optarg);
-                  if (sub_app[app_index] == NULL)
+                  if(strcmp(long_options[option_index].name, "llama")==0)
                   {
-                        fprintf(stderr, "\n*** ERROR *** Application \"%s\"", app[app_index]);
-                        fprintf(stderr, " requires benchmark number \n\n\n");
-                        usage(argv[0]);
-                        break;
+                        multi_app_c++;
+                        strcpy(multi_app_bench, optarg);
+                  } else
+                  {
+                        strcpy(app[app_index], long_options[option_index].name);
+                        strcpy(sub_app[app_index], optarg);
+                        if (sub_app[app_index] == NULL)
+                        {
+                              fprintf(stderr, "\n*** ERROR *** Application \"%s\"", app[app_index]);
+                              fprintf(stderr, " requires benchmark number \n\n\n");
+                              usage(argv[0]);
+                              break;
+                        }
+                        printf("Using benchmark %s of %s\n", sub_app[app_index], app[app_index]);
+                        app_index++;
                   }
-                  printf("Using benchmark %s of %s\n", sub_app[app_index], app[app_index]);
-                  app_index++;
                   break;
 
             case 's':
@@ -223,6 +282,18 @@ void get_options(int argc, char **argv, int *waiting, int *gem5_work_op, int *us
             case 'e':
                   strcpy(events_file, optarg);
                   printf("Events file name: %s\n", events_file);
+                  break;
+
+            case 't':
+                  multi_app_c++;
+                  *num_threads = atoi(optarg);
+                  printf("Number of threads on multi-threaded application %d\n", *num_threads);
+                  break;
+
+            case 'a':
+                  multi_app_c++;
+                  strcpy(multi_app, optarg);
+                  printf("Multi-threaded app: %s\n", multi_app);
                   break;
 
             case 'v':
@@ -275,11 +346,7 @@ void get_options(int argc, char **argv, int *waiting, int *gem5_work_op, int *us
             *num_processors = max_num_processors;
             printf("Number of processors not defined, set to %d\n", *num_processors);
       }
-      else if (*num_processors > max_num_processors)
-      {
-            fprintf(stderr, "Number of processors set to %d and only %d available\n", *num_processors, max_num_processors);
-            exit(-1);
-      }
+
       if (*num_apps == 0)
       {
             *num_apps = app_index;
@@ -300,6 +367,27 @@ void get_options(int argc, char **argv, int *waiting, int *gem5_work_op, int *us
             fprintf(stderr, "Number of applications (%d) greater than the number of"
                             " processors (%d)\n",
                     *num_apps, *num_processors);
+            exit(-1);
+      }
+
+      if(multi_app_c>0) 
+      {
+            if(multi_app_c!=3)
+            {
+                  fprintf(stderr, "Trying to use multi-threaded application but not all options specified:"
+                                  "-t <num_threads> -a <multi-threaded app> and --llama <bench_name> needed\n");
+                  exit(-1);
+            }
+            else
+            {
+                  *num_processors++; //include the multi-threaded app for synching at the barrier
+            }
+      }
+
+      if (*num_processors > max_num_processors)
+      {
+            fprintf(stderr, "Number of processors set to %d and only %d available. If using multi-threaded app,"
+                            "use -p to specify number of single threaded applications running\n", *num_processors, max_num_processors);
             exit(-1);
       }
 }

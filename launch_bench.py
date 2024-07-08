@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 #
 
 from bench_types import *
@@ -87,7 +87,9 @@ exec_dir=app.getExecPath()
 print(exec_dir)
 checkDir(exec_dir)
 exec_cmd=app.getExecCmd(args.cmd)
+print("Entering %s" % exec_dir)
 os.chdir(exec_dir)
+print("Executing %s" % exec_cmd)
 runCommand(exec_cmd)
 os.chdir(original_dir)
 
